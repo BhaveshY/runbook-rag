@@ -16,4 +16,3 @@ class Settings:
     dimensions: int = field(default_factory=lambda: int(os.getenv("RUNBOOK_EMBEDDING_DIMENSIONS", "768")))
     access_token: str = field(default_factory=lambda: os.getenv("RUNBOOK_ACCESS_TOKEN", ""), repr=False)
     daily_limit: int = field(default_factory=lambda: int(os.getenv("RUNBOOK_DAILY_REQUEST_LIMIT", "200")))
-

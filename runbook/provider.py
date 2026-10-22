@@ -76,4 +76,3 @@ class OpenAI:
             return json.loads(text), {"input_tokens": result.get("usage", {}).get("input_tokens", 0), "output_tokens": result.get("usage", {}).get("output_tokens", 0), "model": result.get("model", self.settings.model)}
         except (ValueError, TypeError):
             raise ProviderError("The model returned an unreadable response. Please retry.") from None
-

@@ -11,4 +11,3 @@ data/.ingest.lock
 *.log
 .DS_Store
 dist/
-

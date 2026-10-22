@@ -220,4 +220,3 @@ async def home():
 @app.get("/docs", include_in_schema=False)
 async def api_docs():
     return FileResponse(ROOT / "web/api.html")
-

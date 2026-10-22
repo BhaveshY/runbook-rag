@@ -27,4 +27,3 @@ def main():
     else:
         from .evaluate import evaluate
         asyncio.run(evaluate(Settings(), args.answers, args.split, args.output))
-

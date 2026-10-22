@@ -47,3 +47,5 @@ The 95% paired interval for recall uplift over BM25 includes zero. The measured 
 - [Pinned source manifest](../data/sources.json)
 
 The raw report includes dataset and implementation digests, the immutable corpus ID, model identifiers, retrieval settings, Python/NumPy versions, BLAS thread configuration, per-query results, timings, and model verdicts. A rerun is expected to show some variation because remote model generation is nondeterministic.
+
+The exact Python source snapshot used for the committed evaluation is [commit `220b1b62e949`](https://github.com/BhaveshY/runbook-rag/tree/220b1b62e949f92330f72ce92979f91ab7e9126f). Subsequent Python formatting only removed trailing blank lines; AST equivalence was verified. The raw report retains the original implementation digest.

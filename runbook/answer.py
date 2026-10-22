@@ -129,4 +129,3 @@ async def diagnose(retriever: Retriever, query: str, mode: str, k: int = 8, sour
         "trace": {**(retrieval_trace or {}), "generation_ms": round((perf_counter() - generation_start) * 1000, 2), "total_ms": round((perf_counter() - start) * 1000, 2), "usage": usage, "validation": validation},
         "corpus_id": retriever.index.manifest["corpus_id"], "version": retriever.index.manifest["version"],
     }
-

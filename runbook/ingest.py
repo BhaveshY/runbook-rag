@@ -160,4 +160,3 @@ async def _ingest(settings: Settings) -> dict:
     pointer.write_text(json.dumps({"corpus_id": corpus_id}))
     os.replace(pointer, index_root / "current.json")
     return metadata
-
