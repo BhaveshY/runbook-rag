@@ -98,7 +98,7 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
                 )
     provider = OpenAI(settings)
     retriever = Retriever(index, provider)
-    judge_model = os.getenv("RUNBOOK_JUDGE_MODEL", "gpt-5.5")
+    judge_model = os.getenv("RUNBOOK_JUDGE_MODEL", "gpt-6.1-sol")
     judge = OpenAI(replace(settings, model=judge_model)) if answers else None
     records = []
     total_embedding_tokens = 0

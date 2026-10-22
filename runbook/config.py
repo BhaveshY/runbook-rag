@@ -30,13 +30,13 @@ class Settings:
         ).rstrip("/")
     )
     model: str = field(
-        default_factory=lambda: os.getenv("RUNBOOK_MODEL", "gpt-5.4-mini")
+        default_factory=lambda: os.getenv("RUNBOOK_MODEL", "gpt-6-luna")
     )
     rerank_model: str = field(
-        default_factory=lambda: os.getenv("RUNBOOK_RERANK_MODEL", "gpt-5.4-nano")
+        default_factory=lambda: os.getenv("RUNBOOK_RERANK_MODEL", "gpt-6-luna")
     )
     review_model: str = field(
-        default_factory=lambda: os.getenv("RUNBOOK_REVIEW_MODEL", "gpt-5.5")
+        default_factory=lambda: os.getenv("RUNBOOK_REVIEW_MODEL", "gpt-6-luna")
     )
     embedding_model: str = field(
         default_factory=lambda: os.getenv(
