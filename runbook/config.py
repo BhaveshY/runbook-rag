@@ -36,7 +36,7 @@ class Settings:
         default_factory=lambda: os.getenv("RUNBOOK_RERANK_MODEL", "gpt-5.4-nano")
     )
     review_model: str = field(
-        default_factory=lambda: os.getenv("RUNBOOK_REVIEW_MODEL", "gpt-5.4-mini")
+        default_factory=lambda: os.getenv("RUNBOOK_REVIEW_MODEL", "gpt-5.5")
     )
     embedding_model: str = field(
         default_factory=lambda: os.getenv(
