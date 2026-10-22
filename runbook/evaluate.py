@@ -99,6 +99,7 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
     provider = OpenAI(settings)
     retriever = Retriever(index, provider)
     judge_model = os.getenv("RUNBOOK_JUDGE_MODEL", "gpt-6.1-sol")
+    judge_reasoning = os.getenv("RUNBOOK_JUDGE_REASONING", "low")
     judge = OpenAI(replace(settings, model=judge_model)) if answers else None
     records = []
     total_embedding_tokens = 0
@@ -195,7 +196,8 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
                             ),
                             Judgment.model_json_schema(),
                             "grounding_judgment",
-                            1600,
+                            4000,
+                            reasoning_effort=judge_reasoning,
                         )
                         judgment = Judgment.model_validate(raw).model_dump()
                         ids = [c["claim_index"] for c in judgment["claims"]]
@@ -351,6 +353,7 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
             "completed": len(completed),
             "failures": len(attempts) - len(completed),
             "judge_model": judge_model,
+            "judge_reasoning": judge_reasoning,
             "judge_failures": sum("judge_error" in a for a in completed),
             "raw_citations": raw_citations,
             "raw_quote_validity": sum(

@@ -119,13 +119,14 @@ class OpenAI:
         name: str,
         max_tokens: int = 2200,
         model: str | None = None,
+        reasoning_effort: str = "none",
     ) -> tuple[dict, dict]:
         result = await self.post(
             "/responses",
             {
                 "model": model or self.settings.model,
                 "store": False,
-                "reasoning": {"effort": "none"},
+                "reasoning": {"effort": reasoning_effort},
                 "input": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": content},
