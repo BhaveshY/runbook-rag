@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Runbook API</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+    <link rel="icon" href="/assets/favicon.svg" />
+  </head>
+  <body>
+    <main class="api-reference">
+      <a href="/" class="text-button">← Back to Runbook</a>
+      <p class="eyebrow">HTTP API · V0.1</p>
+      <h1>Runbook API</h1>
+      <p class="intro">
+        Same retrieval and answer pipeline as the workspace.
+        <a href="/openapi.json">Download the OpenAPI schema.</a>
+      </p>
+      <section class="panel">
+        <div class="panel-body">
+          <h2>Investigate an incident</h2>
+          <p>
+            POST /api/diagnose returns a complete diagnostic note, source
+            passages, and timings. POST /api/diagnose/stream sends server-sent
+            events: status, evidence, answer, or error. The stream sends
+            evidence first; it buffers the answer until quote validation
+            finishes.
+          </p>
+          <pre class="api-code">
+curl http://localhost:8000/api/diagnose \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"My pod is stuck in ImagePullBackOff. What should I inspect?","mode":"reranked"}'</pre
+          >
+          <p>
+            Queries: 8–4,000 characters. Modes: reranked (default), hybrid,
+            dense, bm25. Context k: 3–10 (default 8). All modes use OpenAI for
+            answer generation. Never put an OpenAI key in a browser request.
+          </p>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-body">
+          <h2>Search without generation</h2>
+          <p>
+            POST /api/search accepts the same body and returns source passages
+            plus the retrieval trace. BM25 search makes no model API request.
+            Semantic and hybrid search use an embedding; reranked search adds a
+            model call.
+          </p>
+        </div>
+      </section>
+      <section class="panel table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>GET endpoint</th>
+              <th>Returns</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>/api/health</td>
+              <td>
+                Index readiness, credential-presence flag, and access-token
+                requirement. It does not probe the provider.
+              </td>
+            </tr>
+            <tr>
+              <td>/api/corpus</td>
+              <td>
+                Corpus hash, source revision, document list, and embedding
+                configuration.
+              </td>
+            </tr>
+            <tr>
+              <td>/api/benchmark</td>
+              <td>
+                The committed benchmark report, including individual cases and
+                failures.
+              </td>
+            </tr>
+            <tr>
+              <td>/openapi.json</td>
+              <td>Machine-readable endpoint definitions.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+      <section class="panel">
+        <div class="panel-body">
+          <h2>Access and failure handling</h2>
+          <p>
+            If the operator sets RUNBOOK_ACCESS_TOKEN, POST requests require
+            Authorization: Bearer &lt;instance-token&gt;. This is a separate
+            application token, not the OpenAI key. Public corpus metadata and
+            benchmark results remain readable.
+          </p>
+          <p>
+            401: missing instance token. 413: body exceeds 16 KiB. 422: invalid
+            query or mode. 429: per-peer rate limit or process request budget
+            reached. 503: index or provider unavailable. After a stream begins,
+            failures arrive as an error event; clients must handle that event
+            even though the HTTP status is 200.
+          </p>
+          <p>
+            Commands are displayed, never executed. Query text is not persisted
+            by Runbook. The server forwards incidents and retrieved
+            documentation to OpenAI with response storage disabled; the
+            provider's retention policy still applies.
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

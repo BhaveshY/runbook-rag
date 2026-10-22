@@ -1,0 +1,17 @@
+Runbook application code is licensed under the MIT License.
+
+The indexed documentation is authored by Kubernetes contributors, from
+https://github.com/kubernetes/website at the exact revision recorded in
+data/sources.json. Kubernetes documentation is licensed under Creative Commons
+Attribution 4.0 International (CC BY 4.0):
+https://creativecommons.org/licenses/by/4.0/
+https://github.com/kubernetes/website/blob/8817d358864b70a9710c5ad34f78df6a239be33d/LICENSE
+
+The ingestion pipeline removes presentation markup, splits text into passages,
+and computes embeddings. Each passage retains its source URL, line range,
+version, and content hash. Evaluation labels and generated diagnostic examples
+include attributed excerpts of this material under CC BY 4.0.
+
+Runbook is an independent project and is not affiliated with or endorsed by
+the Kubernetes project or the Cloud Native Computing Foundation.
+

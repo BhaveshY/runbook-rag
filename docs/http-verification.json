@@ -1,0 +1,120 @@
+{
+  "timestamp": "2026-10-22T12:24:08Z",
+  "checks": [
+    {
+      "check": "readiness",
+      "result": "passed",
+      "detail": {
+        "status": "ready",
+        "provider_configured": true,
+        "access_required": false,
+        "model": "gpt-5.4-mini"
+      }
+    },
+    {
+      "check": "self-hosted API reference",
+      "result": "passed",
+      "detail": "HTTP 200; no remote scripts"
+    },
+    {
+      "check": "BM25 HTTP search",
+      "result": "passed",
+      "detail": {
+        "sources": 8,
+        "trace": {
+          "mode": "bm25",
+          "embedding_ms": 0,
+          "ranking_ms": 0.26,
+          "retrieval_ms": 0.26,
+          "embedding_tokens": 0,
+          "embedding_cache_hit": false
+        }
+      }
+    },
+    {
+      "check": "short query validation",
+      "result": "passed",
+      "detail": 422
+    },
+    {
+      "check": "invalid retrieval mode",
+      "result": "passed",
+      "detail": 422
+    },
+    {
+      "check": "large request body",
+      "result": "passed",
+      "detail": 413
+    },
+    {
+      "check": "chunked body size limit",
+      "result": "passed",
+      "detail": 413
+    },
+    {
+      "check": "unknown secret abstention",
+      "result": "passed",
+      "detail": {
+        "status": "insufficient_evidence",
+        "claims": 0
+      }
+    },
+    {
+      "check": "per-peer rate limit",
+      "result": "passed",
+      "detail": {
+        "rate_limited_requests": 4,
+        "total": 22
+      }
+    },
+    {
+      "check": "instance-token enforcement",
+      "result": "passed",
+      "detail": 401
+    },
+    {
+      "check": "authorized local search during provider outage",
+      "result": "passed",
+      "detail": 200
+    },
+    {
+      "check": "provider unavailable error",
+      "result": "passed",
+      "detail": {
+        "detail": "The model provider is unavailable. Please try again."
+      }
+    },
+    {
+      "check": "daily paid-request budget",
+      "result": "passed",
+      "detail": {
+        "detail": "This instance's daily request budget is exhausted."
+      }
+    },
+    {
+      "check": "real provider rejection of reranker falls back to hybrid",
+      "result": "passed",
+      "trace": {
+        "mode": "reranked",
+        "embedding_ms": 360.76,
+        "ranking_ms": 0.74,
+        "retrieval_ms": 736.64,
+        "embedding_tokens": 10,
+        "embedding_cache_hit": false,
+        "rerank_ms": 375.11,
+        "rerank_fallback": true,
+        "rerank_fallback_reason": "The model provider could not complete this request (HTTP 404).",
+        "rerank_model": "runbook-verification-invalid-model",
+        "rerank_candidates": 30,
+        "rerank_usage": {}
+      }
+    },
+    {
+      "check": "corrupted embedding index fails closed",
+      "result": "passed",
+      "detail": {
+        "detail": "Index validation failed; rebuild the corpus."
+      }
+    }
+  ]
+}

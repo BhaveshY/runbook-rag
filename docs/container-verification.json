@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-10-22T12:30:23Z",
+  "image": "runbook-rag:verified",
+  "checks": {
+    "image_build": "passed",
+    "http_readiness": 200,
+    "ui": 200,
+    "bm25_search": 200,
+    "provider_failure": 503,
+    "runtime_user": "runbook",
+    "docker_health": "healthy"
+  },
+  "scope": "Container verified for startup, UI, local retrieval and provider failure. Live OpenAI generation was verified on the native service."
+}

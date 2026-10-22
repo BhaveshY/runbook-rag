@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Kubernetes troubleshooting with inspectable evidence, precise citations, and a reproducible retrieval benchmark."
+    />
+    <meta name="theme-color" content="#111a18" />
+    <title>Runbook — follow the evidence</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="stylesheet" href="/assets/style.css" />
+    <script type="module" src="/assets/app.js"></script>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <a class="brand" href="/" aria-label="Runbook home"
+          ><span class="brand-mark">r<span>.</span></span
+          ><span
+            >runbook<span class="brand-sub">THE INCIDENT WORKSPACE</span></span
+          ></a
+        >
+        <div class="workspace-label">WORKSPACE <span>01</span></div>
+        <nav aria-label="Main navigation">
+          <button class="nav-item active" data-view="investigate">
+            <span class="nav-icon">⌕</span> Investigate
+            <span class="nav-key">I</span>
+          </button>
+          <button class="nav-item" data-view="benchmark">
+            <span class="nav-icon">▥</span> Evaluation
+            <span class="nav-key">E</span>
+          </button>
+          <button class="nav-item" data-view="sources">
+            <span class="nav-icon">▤</span> Source library
+            <span class="nav-key">S</span>
+          </button>
+        </nav>
+        <div class="sidebar-note">
+          <span class="status-dot"></span> Built on official documentation
+          <p>
+            Every answer starts with evidence.<br />Every claim keeps its
+            source.
+          </p>
+        </div>
+        <div class="sidebar-footer">
+          <div class="avatar">K</div>
+          <div>Kubernetes <span id="sidebar-version">documentation</span></div>
+          <span class="small-arrow"
+            ><span class="arrow-up" aria-hidden="true"></span
+          ></span>
+        </div>
+      </aside>
+      <main>
+        <header class="topbar">
+          <div>
+            <span class="breadcrumb">Workspace</span><span class="slash">/</span
+            ><span id="page-label">Investigate</span>
+          </div>
+          <div class="topbar-right">
+            <span id="service-status" class="service-status"
+              ><span class="status-dot"></span> Connecting</span
+            ><a href="/docs" target="_blank" rel="noopener"
+              >API docs <span class="arrow-up" aria-hidden="true"></span
+            ></a>
+          </div>
+        </header>
+        <section id="view-investigate" class="view">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">
+                <span class="tiny-cross">+</span> FROM SYMPTOM TO SOURCE
+              </p>
+              <h1>Follow the evidence.</h1>
+              <p class="intro">
+                Describe what broke. Find what the docs actually say.
+              </p>
+            </div>
+            <span class="outline-tag" id="version-tag">KUBERNETES</span>
+          </div>
+          <div class="investigation-grid">
+            <div class="investigation-main">
+              <form id="incident-form" class="composer">
+                <div class="card-label">
+                  <span class="number-label">01</span> THE INCIDENT
+                  <span class="right-note">No cluster access required</span>
+                </div>
+                <label class="sr-only" for="incident"
+                  >Describe the Kubernetes incident</label
+                >
+                <textarea
+                  id="incident"
+                  name="incident"
+                  minlength="8"
+                  maxlength="4000"
+                  rows="5"
+                  placeholder="e.g. My pod keeps restarting with CrashLoopBackOff. How do I check whether the liveness probe is killing it?"
+                  required
+                ></textarea>
+                <div class="composer-bottom">
+                  <div class="mode-select">
+                    <label for="mode">Retrieval</label
+                    ><select id="mode">
+                      <option value="reranked">Hybrid + reranking</option>
+                      <option value="hybrid">Hybrid · faster search</option>
+                      <option value="bm25">BM25 · keyword baseline</option>
+                      <option value="dense">Semantic · embeddings only</option>
+                    </select>
+                  </div>
+                  <button type="submit" class="primary-button" id="submit">
+                    Investigate
+                    <span class="arrow-up" aria-hidden="true"></span></button
+                  ><button
+                    type="button"
+                    id="cancel"
+                    class="secondary-button"
+                    hidden
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div id="access-row" class="access-row" hidden>
+                  <label for="access-token">Instance access token</label
+                  ><input
+                    type="password"
+                    id="access-token"
+                    autocomplete="off"
+                    placeholder="Kept in memory for this tab"
+                  />
+                </div>
+              </form>
+              <div class="privacy-note">
+                <span>◈</span> Incident text is sent to OpenAI. Remove secrets
+                and personal data before submitting.
+              </div>
+              <div id="examples" class="examples">
+                <span>START WITH A COMMON INCIDENT</span>
+                <div class="example-buttons">
+                  <button
+                    data-query="My pod is stuck in ImagePullBackOff. What does it mean and what should I inspect?"
+                  >
+                    ImagePullBackOff
+                    <span
+                      ><span class="arrow-up" aria-hidden="true"></span
+                    ></span></button
+                  ><button
+                    data-query="My container is OOMKilled and keeps restarting. How do memory requests and limits affect this?"
+                  >
+                    OOMKilled
+                    <span
+                      ><span class="arrow-up" aria-hidden="true"></span
+                    ></span></button
+                  ><button
+                    data-query="My Service exists but receives no traffic. How do I check its selectors and EndpointSlices?"
+                  >
+                    No service traffic
+                    <span
+                      ><span class="arrow-up" aria-hidden="true"></span
+                    ></span>
+                  </button>
+                </div>
+              </div>
+              <div
+                id="progress"
+                class="progress"
+                role="status"
+                aria-live="polite"
+                hidden
+              >
+                <span class="spinner"></span
+                ><span id="progress-text">Finding relevant evidence…</span
+                ><span id="elapsed">0.0s</span>
+              </div>
+              <div id="error" class="error-box" role="alert" hidden></div>
+              <section
+                id="answer-panel"
+                class="answer-panel"
+                hidden
+                aria-label="Diagnosis"
+              >
+                <div class="section-header">
+                  <span class="card-label"
+                    ><span class="number-label">02</span> DIAGNOSTIC NOTE</span
+                  ><button class="text-button" id="export">
+                    Export note ↓
+                  </button>
+                </div>
+                <div id="answer-content"></div>
+                <div id="trace" class="trace"></div>
+              </section>
+              <section id="empty-state" class="empty-state">
+                <div class="evidence-symbol">
+                  <span></span><span></span><span></span
+                  ><b><span class="arrow-up" aria-hidden="true"></span></b>
+                </div>
+                <h2>A shorter path to a useful next step.</h2>
+                <p>
+                  Get a source-backed explanation, read-only diagnostic
+                  checks,<br class="desktop-break" />
+                  and a clear account of what remains unknown.
+                </p>
+                <div class="principles">
+                  <span><i>01</i> Retrieve</span><span><i>02</i> Ground</span
+                  ><span><i>03</i> Inspect</span>
+                </div>
+              </section>
+            </div>
+            <aside class="evidence-panel">
+              <div class="section-header">
+                <span class="card-label">EVIDENCE</span
+                ><span id="evidence-count" class="count">0</span>
+              </div>
+              <div id="evidence-placeholder">
+                <span class="evidence-glyph">▤</span>
+                <h3>Inspect the original passages.</h3>
+                <p>
+                  Relevant passages appear here before the answer. Open any
+                  citation to inspect the exact evidence.
+                </p>
+              </div>
+              <div id="evidence-list"></div>
+              <div class="corpus-footer">
+                <span class="status-dot"></span
+                ><span id="corpus-summary">Loading corpus…</span>
+              </div>
+            </aside>
+          </div>
+          <footer class="page-footer">
+            <span>RETRIEVE. VERIFY. RESOLVE.</span
+            ><span
+              >Commands are suggestions. Nothing runs against your
+              cluster.</span
+            >
+          </footer>
+        </section>
+        <section id="view-benchmark" class="view" hidden>
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">MEASURED RETRIEVAL QUALITY</p>
+              <h1>Show the work.</h1>
+              <p class="intro">
+                Same questions. Same corpus. Four retrieval strategies.
+              </p>
+            </div>
+            <a
+              class="secondary-button"
+              href="/api/benchmark"
+              target="_blank"
+              rel="noopener"
+              >Raw results <span class="arrow-up" aria-hidden="true"></span
+            ></a>
+          </div>
+          <div id="benchmark-content" aria-live="polite"></div>
+        </section>
+        <section id="view-sources" class="view" hidden>
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">A BOUNDED, AUDITABLE CORPUS</p>
+              <h1>Go to the source.</h1>
+              <p class="intro">
+                Official Kubernetes documentation, pinned to an immutable
+                revision.
+              </p>
+            </div>
+            <span class="outline-tag">CC BY 4.0</span>
+          </div>
+          <div id="source-content"></div>
+        </section>
+      </main>
+    </div>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </body>
+</html>

@@ -1,0 +1,46 @@
+{
+  "timestamp": "2026-10-22T12:26:09Z",
+  "browser": "Chromium via Playwright",
+  "checks": [
+    {
+      "check": "evidence arrives before validated answer",
+      "result": "passed"
+    },
+    {
+      "check": "live reranked diagnosis and citation inspection",
+      "result": "passed"
+    },
+    {
+      "check": "read-only command clipboard copy",
+      "result": "passed"
+    },
+    {
+      "check": "Markdown export retains source URLs",
+      "result": "passed"
+    },
+    {
+      "check": "real benchmark, four ablations, holdout filter and per-case inspection",
+      "result": "passed"
+    },
+    {
+      "check": "28 immutable source references",
+      "result": "passed"
+    },
+    {
+      "check": "unsupported and injected request abstention in browser",
+      "result": "passed"
+    },
+    {
+      "check": "cancel investigation restores form",
+      "result": "passed"
+    },
+    {
+      "check": "390px mobile workspace and evaluation have no page overflow",
+      "result": "passed"
+    },
+    {
+      "check": "self-hosted API docs and no JavaScript exceptions",
+      "result": "passed"
+    }
+  ]
+}
