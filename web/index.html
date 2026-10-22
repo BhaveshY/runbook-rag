@@ -26,15 +26,12 @@
         <nav aria-label="Main navigation">
           <button class="nav-item active" data-view="investigate">
             <span class="nav-icon">⌕</span> Investigate
-            <span class="nav-key">I</span>
           </button>
           <button class="nav-item" data-view="benchmark">
             <span class="nav-icon">▥</span> Evaluation
-            <span class="nav-key">E</span>
           </button>
           <button class="nav-item" data-view="sources">
             <span class="nav-icon">▤</span> Source library
-            <span class="nav-key">S</span>
           </button>
         </nav>
         <div class="sidebar-note">
@@ -101,7 +98,7 @@
                 <div class="composer-bottom">
                   <div class="mode-select">
                     <label for="mode">Retrieval</label
-                    ><select id="mode">
+                    ><select id="mode" aria-label="Retrieval strategy">
                       <option value="reranked">Hybrid + reranking</option>
                       <option value="hybrid">Hybrid · faster search</option>
                       <option value="bm25">BM25 · keyword baseline</option>
@@ -170,8 +167,9 @@
               >
                 <span class="spinner"></span
                 ><span id="progress-text">Finding relevant evidence…</span
-                ><span id="elapsed">0.0s</span>
+                ><span id="elapsed" aria-hidden="true">0.0s</span>
               </div>
+              <div id="completion-status" class="sr-only" role="status"></div>
               <div id="error" class="error-box" role="alert" hidden></div>
               <section
                 id="answer-panel"

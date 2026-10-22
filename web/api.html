@@ -23,10 +23,15 @@
             POST /api/diagnose returns a complete diagnostic note, source
             passages, and timings. POST /api/diagnose/stream sends server-sent
             events: status, evidence, answer, or error. The stream sends
-            evidence first; it buffers the answer until quote validation
-            finishes.
+            evidence first; it buffers the answer until exact-quote validation
+            and a separate citation-support review finish. Unsupported claims
+            and checks are removed. Review failure returns an error.
           </p>
-          <pre class="api-code">
+          <pre
+            class="api-code"
+            tabindex="0"
+            aria-label="Example diagnosis request"
+          >
 curl http://localhost:8000/api/diagnose \
   -H 'Content-Type: application/json' \
   -d '{"query":"My pod is stuck in ImagePullBackOff. What should I inspect?","mode":"reranked"}'</pre
@@ -49,7 +54,7 @@ curl http://localhost:8000/api/diagnose \
           </p>
         </div>
       </section>
-      <section class="panel table-wrap">
+      <section class="panel table-wrap" tabindex="0" aria-label="GET endpoints">
         <table>
           <thead>
             <tr>
@@ -76,7 +81,8 @@ curl http://localhost:8000/api/diagnose \
               <td>/api/benchmark</td>
               <td>
                 The committed benchmark report, including individual cases and
-                failures.
+                failures, with a compatibility check against the running code,
+                corpus, dataset, and model configuration.
               </td>
             </tr>
             <tr>
@@ -96,11 +102,12 @@ curl http://localhost:8000/api/diagnose \
             benchmark results remain readable.
           </p>
           <p>
-            401: missing instance token. 413: body exceeds 16 KiB. 422: invalid
-            query or mode. 429: per-peer rate limit or process request budget
-            reached. 503: index or provider unavailable. After a stream begins,
-            failures arrive as an error event; clients must handle that event
-            even though the HTTP status is 200.
+            401: missing instance token. 408: body upload exceeds 10 seconds.
+            413: body exceeds 16 KiB. 422: invalid query or mode. 429: per-peer
+            rate limit or process request budget reached. 503: index, provider,
+            or evidence review unavailable. After a stream begins, failures
+            arrive as an error event; clients must handle that event even though
+            the HTTP status is 200.
           </p>
           <p>
             Commands are displayed, never executed. Query text is not persisted

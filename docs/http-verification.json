@@ -1,120 +1,162 @@
 {
-  "timestamp": "2026-10-22T12:24:08Z",
-  "checks": [
+  "created_at": "2026-10-22T13:51:45.294099+00:00",
+  "method": "Real HTTP against the running service after the GPT-6 Luna switch. Live hosted embeddings, reranking, generation and support review; no provider interception.",
+  "scenarios": [
     {
-      "check": "readiness",
-      "result": "passed",
-      "detail": {
-        "status": "ready",
-        "provider_configured": true,
-        "access_required": false,
-        "model": "gpt-5.4-mini"
+      "check": "luna_readiness",
+      "passed": true,
+      "model": "gpt-6-luna"
+    },
+    {
+      "check": "self_hosted_ui_and_reference",
+      "passed": true
+    },
+    {
+      "check": "same_origin_security_and_no_store",
+      "passed": true
+    },
+    {
+      "check": "pinned_corpus",
+      "passed": true
+    },
+    {
+      "check": "report_matches_running_luna_code_and_models",
+      "passed": true
+    },
+    {
+      "check": "live_bm25_retrieval",
+      "passed": true,
+      "trace": {
+        "mode": "bm25",
+        "embedding_ms": 0,
+        "ranking_ms": 0.36,
+        "retrieval_ms": 0.36,
+        "embedding_tokens": 0,
+        "embedding_cache_hit": false
       }
     },
     {
-      "check": "self-hosted API reference",
-      "result": "passed",
-      "detail": "HTTP 200; no remote scripts"
+      "check": "live_dense_retrieval",
+      "passed": true,
+      "trace": {
+        "mode": "dense",
+        "embedding_ms": 367.9,
+        "ranking_ms": 0.53,
+        "retrieval_ms": 368.43,
+        "embedding_tokens": 21,
+        "embedding_cache_hit": false
+      }
     },
     {
-      "check": "BM25 HTTP search",
-      "result": "passed",
-      "detail": {
-        "sources": 8,
-        "trace": {
-          "mode": "bm25",
-          "embedding_ms": 0,
-          "ranking_ms": 0.26,
-          "retrieval_ms": 0.26,
-          "embedding_tokens": 0,
-          "embedding_cache_hit": false
+      "check": "live_hybrid_retrieval",
+      "passed": true,
+      "trace": {
+        "mode": "hybrid",
+        "embedding_ms": 0.0,
+        "ranking_ms": 0.43,
+        "retrieval_ms": 0.44,
+        "embedding_tokens": 0,
+        "embedding_cache_hit": true
+      }
+    },
+    {
+      "check": "live_reranked_retrieval",
+      "passed": true,
+      "trace": {
+        "mode": "reranked",
+        "embedding_ms": 0.0,
+        "ranking_ms": 0.45,
+        "retrieval_ms": 2086.06,
+        "embedding_tokens": 0,
+        "embedding_cache_hit": true,
+        "rerank_ms": 2085.49,
+        "rerank_fallback": false,
+        "rerank_fallback_reason": null,
+        "rerank_duplicates_removed": 0,
+        "rerank_model": "gpt-6-luna",
+        "rerank_candidates": 30,
+        "rerank_usage": {
+          "input_tokens": 9188,
+          "output_tokens": 45,
+          "model": "gpt-6-luna"
         }
       }
     },
     {
-      "check": "short query validation",
-      "result": "passed",
-      "detail": 422
+      "check": "repeat_query_embedding_cache_hit",
+      "passed": true
     },
     {
-      "check": "invalid retrieval mode",
-      "result": "passed",
-      "detail": 422
-    },
-    {
-      "check": "large request body",
-      "result": "passed",
-      "detail": 413
-    },
-    {
-      "check": "chunked body size limit",
-      "result": "passed",
-      "detail": 413
-    },
-    {
-      "check": "unknown secret abstention",
-      "result": "passed",
-      "detail": {
-        "status": "insufficient_evidence",
-        "claims": 0
-      }
-    },
-    {
-      "check": "per-peer rate limit",
-      "result": "passed",
-      "detail": {
-        "rate_limited_requests": 4,
-        "total": 22
-      }
-    },
-    {
-      "check": "instance-token enforcement",
-      "result": "passed",
-      "detail": 401
-    },
-    {
-      "check": "authorized local search during provider outage",
-      "result": "passed",
-      "detail": 200
-    },
-    {
-      "check": "provider unavailable error",
-      "result": "passed",
-      "detail": {
-        "detail": "The model provider is unavailable. Please try again."
-      }
-    },
-    {
-      "check": "daily paid-request budget",
-      "result": "passed",
-      "detail": {
-        "detail": "This instance's daily request budget is exhausted."
-      }
-    },
-    {
-      "check": "real provider rejection of reranker falls back to hybrid",
-      "result": "passed",
+      "check": "live_luna_generation_and_support_review",
+      "passed": true,
       "trace": {
         "mode": "reranked",
-        "embedding_ms": 360.76,
-        "ranking_ms": 0.74,
-        "retrieval_ms": 736.64,
-        "embedding_tokens": 10,
-        "embedding_cache_hit": false,
-        "rerank_ms": 375.11,
-        "rerank_fallback": true,
-        "rerank_fallback_reason": "The model provider could not complete this request (HTTP 404).",
-        "rerank_model": "runbook-verification-invalid-model",
+        "embedding_ms": 0.0,
+        "ranking_ms": 1.93,
+        "retrieval_ms": 1351.55,
+        "embedding_tokens": 0,
+        "embedding_cache_hit": true,
+        "rerank_ms": 1349.57,
+        "rerank_fallback": false,
+        "rerank_fallback_reason": null,
+        "rerank_duplicates_removed": 0,
+        "rerank_model": "gpt-6-luna",
         "rerank_candidates": 30,
-        "rerank_usage": {}
+        "rerank_usage": {
+          "input_tokens": 9188,
+          "output_tokens": 45,
+          "model": "gpt-6-luna"
+        },
+        "generation_ms": 3949.69,
+        "total_ms": 6282.88,
+        "usage": {
+          "input_tokens": 3191,
+          "output_tokens": 317,
+          "model": "gpt-6-luna"
+        },
+        "validation": {
+          "citations_checked": 2,
+          "exact_quotes_valid": 2,
+          "claims_removed": 0,
+          "checks_removed": 0,
+          "semantic_support": "not automatically guaranteed"
+        },
+        "support_review": {
+          "performed": true,
+          "claims_checked": 2,
+          "checks_checked": 0,
+          "claims_removed": 0,
+          "checks_removed": 0,
+          "review_ms": 981.27,
+          "usage": {
+            "input_tokens": 492,
+            "output_tokens": 17,
+            "model": "gpt-6-luna"
+          }
+        }
       }
     },
     {
-      "check": "corrupted embedding index fails closed",
-      "result": "passed",
-      "detail": {
-        "detail": "Index validation failed; rebuild the corpus."
-      }
+      "check": "live_exact_quotes_and_immutable_links",
+      "passed": true
+    },
+    {
+      "check": "live_unknown_secret_abstention",
+      "passed": true
+    },
+    {
+      "check": "short_query_rejected",
+      "passed": true
+    },
+    {
+      "check": "invalid_mode_rejected",
+      "passed": true
+    },
+    {
+      "check": "large_body_rejected_with_security_headers",
+      "passed": true
     }
-  ]
+  ],
+  "passed": 16,
+  "total": 16
 }

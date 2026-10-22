@@ -2,50 +2,43 @@
 
 ## Dataset and provenance
 
-[cases.json](../eval/cases.json) has 40 author-curated cases: 32 answerable questions and 8 unanswerable/adversarial requests. Every positive has one or more exact source-passage anchors and a document ID. Cases include errors, paraphrased symptoms, configuration semantics, a two-source comparison, out-of-scope domains, unavailable cluster state, unknown secrets, version mismatch, and prompt injection.
+[cases.json](../eval/cases.json) contains 40 author-curated cases: 32 answerable and 8 unsupported/adversarial requests. Each positive has exact source-passage anchors and document IDs. It covers errors, paraphrases, configuration semantics, a two-source comparison, unknown cluster state, secrets, unsupported domains/versions, and prompt injection.
 
-Labels were authored with AI assistance from the pinned documentation and validated for existence before scoring. The 20/20 development/holdout partition was fixed before the first run. Initial holdout scores were inspected before reranking was introduced, so **the partition is not a blinded generalization estimate**. No externally curated benchmark, human adjudication study, or real incident workload is claimed.
+Labels were authored with AI assistance, validated against the pinned corpus, and have not been changed to turn observed misses into hits. The 20/20 development/holdout partition predates the first measurement. Initial holdout results were inspected before reranking was introduced; **it is not a blinded generalization estimate**. There is no claim of a real incident workload or independent expert adjudication.
 
 ## Retrieval metrics
 
-For each positive question, a retrieved passage matches a gold item only if it has the same document ID and contains the labeled text after whitespace normalization and case folding.
+A match requires the gold document ID and labeled text after whitespace normalization and case folding. Evidence recall@5 is the fraction of each question's gold anchors recovered, macro-averaged over positive questions. Document recall@5 ignores which passage was recovered. MRR@5 measures first matching rank. nDCG@5 credits the first recovery of each evidence item, with no gain for redundant evidence; the current multi-source case has anchors in different documents.
 
-- **Evidence recall@5:** fraction of that question's gold evidence items recovered in its first five passages; macro-averaged over questions.
-- **Document recall@5:** fraction of its labeled document IDs recovered, regardless of exact passage.
-- **MRR@5:** reciprocal rank of the first matching passage, zero if none.
-- **nDCG@5:** binary gain for first recovery of a gold evidence item; redundant retrieval of the same evidence has no additional gain. The current multi-source case has gold items in separate documents.
-- **Latency:** serial cold-query embedding plus local ranking; reranking adds its own measured request latency. Embeddings are shared across methods for fair cost/latency accounting, not fetched independently under different provider conditions.
-- **Uncertainty:** 2,000 bootstrap samples of question-level scores with a fixed seed. The uplift interval is a paired bootstrap against BM25.
+All strategies use the same index, top-five output budget, and two-per-document output cap. Reranking adds a 30-candidate hybrid pool with four passages per document. Its measured improvement belongs to the combined configuration, not solely to the reranking model.
 
-Unanswerable cases have no relevant passages and are excluded from retrieval aggregates. Their retrieval output is still retained. Their important outcome is whether the answer pipeline abstains.
+Query embeddings are requested once per case, without a cache, and their measured latency is charged equally to dense, hybrid, and reranked search. BM25 makes no API call. Reranking adds its measured API latency. Bootstrap intervals use 2,000 fixed-seed question-level resamples; uplift uses paired resampling against BM25. Negative cases stay in the report but are excluded from retrieval aggregates.
 
-All strategies use the same index and a five-passage evaluation budget. Reranking uses 30 hybrid candidates with a four-per-document candidate cap; the final output uses the same two-per-document cap as the baselines. This changes both ordering and candidate diversity, so the observed improvement belongs to the combined reranked configuration, not exclusively to the model.
+The current default achieves **87.5%** recall@5 (95% interval **75.0%–96.9%**), with **3.13 s** retrieval p95. Development recall is 100.0%; holdout recall is 75.0%. Exact-anchor misses: **H05, H09, H11, H12**. A different valid passage may still be scored as a miss. The paired uplift interval is 0.0–34.4 percentage points, so this small sample cannot establish broad superiority.
 
-## Answer metrics
+## Answer evaluation
 
-Twenty-two cases have `answer_eval: true`: 14 answerable and all 8 unanswerable cases. The full pipeline generates each answer using eight passages. This deliberately differs from the top-five retrieval measurement and is recorded in the report.
+Twenty-two preselected cases exercise generation: 14 positive and all 8 negative cases. They use eight context passages, deliberately differing from retrieval's top-five measurement. Generation uses `gpt-6-luna`; production support review uses `gpt-6-luna`. Exact-quote validity is measured before filtering. Review rejection counts are retained, so stricter filtering is visible.
 
-The exact-quote metric is measured **before** filtering so that invalid generations remain visible. A separate `gpt-5.5` request receives the question, answer, and cited source passages. It evaluates each retained claim for support and returns an indexed verdict and reason. The judge is instructed to score the evidence actually cited, rather than granting credit for an uncited fact elsewhere in the context.
+A separate `gpt-6.1-sol` invocation with low reasoning effort receives the question, retained answer, and sources. It judges every observation and every check's purpose, command, and expected signal against their own cited passages. It must return exactly one indexed verdict per item. The judge also records whether the answer addresses the question. Generation and judge failures have explicit denominators rather than disappearing from scores.
 
-The judge is an imperfect proxy. It has no ground-truth access to a cluster, and may share biases with the answer model. The support score applies to claim text; diagnostic check purposes and expected signals are not independently judged. Answer/abstention accuracy compares the returned status with the dataset label; it is not a factual answer-correctness metric.
+Current measurements: 21/22 complete answers; 27/27 exact quotations; 22/22 supported observations; 1/2 supported diagnostic checks; 13/13 judged positive answers address the question. All 8 negative cases abstained. Full-pipeline p95 is 7.33 s. Support review removed 0 observations and 0 checks after quote/command filtering. A check may be omitted even when an explanation is supported.
 
-Provider failures count as failed answer decisions rather than disappearing from the denominator. Judge failures are separately recorded. No external calls failed in the committed final run.
+**Review and evaluation use different models from the same provider. Their errors can still be correlated.** A favorable score is a model judgment, not proof of truth. The reviewer sees each item's exact quotes; the evaluator sees the cited passages. Different context and nondeterminism can produce different decisions. The release reviewer explicitly allows example-name substitution and a namespace flag; the stricter evaluation judge rejected a check for an undocumented namespace flag. That rubric difference remains visible in the reported score. Status agreement measures answering versus abstention, not complete factual correctness. Latency is a single serial run; it is not a production SLA.
 
-## Observed limits
+## What changed after measurement
 
-The default retrieval configuration recovered every gold passage on development questions and 75% on the fixed holdout partition. Four holdout questions missed their exact evidence anchor: NoExecute eviction (H05), readiness/EndpointSlice behavior (H09), namespace-relative DNS (H11), and Service port mapping (H12). These are visible in the report. Some have other relevant passages, which explains the gap between exact-passage and document recall; the labels were left unchanged.
+The first evaluation of diagnostic checks found only 3/15 supported checks (`3017d38`). A small-model production review still left only 1/7 supported checks in the next run (`9f3dda9`). A stronger reviewer left 1/2 supported checks (`e79238f`). These runs remain in Git history. They exposed the distinction between a correct quotation and a justified command or expected result. The generator prompt requires explicitly documented procedures. The current run moves all serving model calls to GPT-6 Luna and the separate evaluator to GPT-6.1 Sol. Its judge needed low reasoning effort; the failed compatibility run is retained in `595b33e`. Because both serving models and the evaluator changed, support scores across these versions are not a controlled model comparison. These are exploratory iterations on a known dataset, not independent experiments.
 
-One of 36 retained claims failed the judge in H06. It said PDBs limit voluntary disruption and cannot prevent involuntary disruption, while its attached citation established only the latter. This illustrates why valid quote matching alone is insufficient to claim complete grounding.
+Failures and rejected items in the current evaluation:
 
-The 95% paired interval for recall uplift over BM25 includes zero. The measured improvement is useful for this implementation, but the sample does not establish a general superiority claim. Network latency is from one environment and one run; it is not a throughput or availability SLA.
+- H02 / request failure: The evidence review could not complete. Retrieved passages remain available; please retry.
+- H10 / checks: The passage supports the purpose, expected log output, and command through --previous, but does not document the added -n NAMESPACE option.
 
 ## Artifacts
 
-- [Final four-mode run](../eval/results/latest.json)
-- [Initial three-mode run](../eval/results/initial-hybrid.json)
-- [Development reranking experiment](../eval/results/rerank-dev-experiment.json)
+- [Current full report](../eval/results/latest.json)
 - [Pinned source manifest](../data/sources.json)
+- [End-to-end verification](verification.md)
 
-The raw report includes dataset and implementation digests, the immutable corpus ID, model identifiers, retrieval settings, Python/NumPy versions, BLAS thread configuration, per-query results, timings, and model verdicts. A rerun is expected to show some variation because remote model generation is nondeterministic.
-
-The exact Python source snapshot used for the committed evaluation is Git commit `220b1b62e949f92330f72ce92979f91ab7e9126f`. Subsequent Python formatting only removed trailing blank lines; AST equivalence was verified. The raw report retains the original implementation digest. The supplied Git bundle preserves that snapshot and the complete project history.
+The report records dataset and implementation digests, corpus/revision, model identifiers, retrieval settings, Python/NumPy versions, BLAS threads, every query, timing, review count, and judge verdict. Its Python source snapshot is commit `4a95aef03bd9af351c5a42ef1609f74fc113a593`. Subsequent documentation or browser-only changes do not alter that Python digest. The supplied Git bundle preserves prior experiments and source snapshots.

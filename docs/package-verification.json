@@ -1,0 +1,36 @@
+{
+  "created_at": "2026-10-22T13:54:30.526411+00:00",
+  "method": "Built wheel installed with dependencies into a new virtual environment. Console entrypoint executed from a separate temporary workspace, without the source checkout on the import path.",
+  "scenarios": [
+    {
+      "check": "installed_cli_ingests_with_packaged_manifest_and_reuses_index",
+      "passed": true
+    },
+    {
+      "check": "import_is_from_installed_wheel",
+      "passed": true
+    },
+    {
+      "check": "wheel_health",
+      "passed": true
+    },
+    {
+      "check": "wheel_static_assets_and_docs",
+      "passed": true
+    },
+    {
+      "check": "wheel_bm25_retrieval",
+      "passed": true
+    },
+    {
+      "check": "wheel_reports_no_unmeasured_benchmark",
+      "passed": true
+    },
+    {
+      "check": "wheel_reads_workspace_evaluation_report",
+      "passed": true
+    }
+  ],
+  "passed": 7,
+  "total": 7
+}

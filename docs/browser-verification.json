@@ -1,46 +1,219 @@
 {
-  "timestamp": "2026-10-22T12:26:09Z",
-  "browser": "Chromium via Playwright",
-  "checks": [
+  "created_at": "2026-10-22T13:54:32.477454+00:00",
+  "method": "Chromium with live OpenAI. Original 38 scenarios cover the pre-migration pipeline and three explicitly intercepted browser transport faults. Appended Luna scenarios rerun live streaming, model trace, citations, export, mobile layout and benchmark provenance after migration. Temporary drivers outside repository. Two additional replays verify empty optional text does not leave a blank notice or export section.",
+  "scenarios": [
     {
-      "check": "evidence arrives before validated answer",
-      "result": "passed"
+      "check": "back_and_forward_keep_url_view_and_active_navigation_in_sync",
+      "passed": true
     },
     {
-      "check": "live reranked diagnosis and citation inspection",
-      "result": "passed"
+      "check": "deep_link_survives_reload",
+      "passed": true
     },
     {
-      "check": "read-only command clipboard copy",
-      "result": "passed"
+      "check": "unknown_hash_has_safe_default",
+      "passed": true
     },
     {
-      "check": "Markdown export retains source URLs",
-      "result": "passed"
+      "check": "live_evidence_arrives_before_answer",
+      "passed": true
     },
     {
-      "check": "real benchmark, four ablations, holdout filter and per-case inspection",
-      "result": "passed"
+      "check": "incident_controls_locked_during_generation",
+      "passed": true
     },
     {
-      "check": "28 immutable source references",
-      "result": "passed"
+      "check": "live_stream_completes_successfully",
+      "passed": true
     },
     {
-      "check": "unsupported and injected request abstention in browser",
-      "result": "passed"
+      "check": "live_supported_answer_has_citations",
+      "passed": true
     },
     {
-      "check": "cancel investigation restores form",
-      "result": "passed"
+      "check": "completion_announced_accessibly",
+      "passed": true
     },
     {
-      "check": "390px mobile workspace and evaluation have no page overflow",
-      "result": "passed"
+      "check": "citation_opens_exact_quote_and_moves_keyboard_focus",
+      "passed": true
     },
     {
-      "check": "self-hosted API docs and no JavaScript exceptions",
-      "result": "passed"
+      "check": "immutable_source_url",
+      "passed": true
+    },
+    {
+      "check": "copy_read_only_command",
+      "passed": true,
+      "method": "Live liveness-probe incident; stricter evidence review legitimately omitted checks for the earlier image-pull incident."
+    },
+    {
+      "check": "export_includes_exact_evidence_and_immutable_sources",
+      "passed": true
+    },
+    {
+      "check": "four_retrieval_ablation_rows",
+      "passed": true
+    },
+    {
+      "check": "holdout_filter_and_accessible_selected_state",
+      "passed": true
+    },
+    {
+      "check": "per_question_retrieval_details",
+      "passed": true
+    },
+    {
+      "check": "live_adversarial_unknown_secret_abstention",
+      "passed": true
+    },
+    {
+      "check": "cancel_preserves_evidence_and_restores_controls",
+      "passed": true
+    },
+    {
+      "check": "keyboard_submit_and_recovery_after_cancel",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_360_investigate",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_360_benchmark",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_360_sources",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_390_investigate",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_390_benchmark",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_390_sources",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_768_investigate",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_768_benchmark",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_768_sources",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_1024_investigate",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_1024_benchmark",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_1024_sources",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_1440_investigate",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_1440_benchmark",
+      "passed": true
+    },
+    {
+      "check": "no_page_overflow_1440_sources",
+      "passed": true
+    },
+    {
+      "check": "truncated_stream_has_retryable_error",
+      "passed": true
+    },
+    {
+      "check": "authorization_failure_reveals_access_input",
+      "passed": true
+    },
+    {
+      "check": "health_network_failure_is_visible",
+      "passed": true
+    },
+    {
+      "check": "no_browser_persistence",
+      "passed": true
+    },
+    {
+      "check": "no_javascript_exceptions",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "check": "luna_evidence_before_reviewed_answer",
+      "passed": true,
+      "model": "gpt-6-luna"
+    },
+    {
+      "check": "luna_stream_end_to_end_models",
+      "passed": true,
+      "model": "gpt-6-luna"
+    },
+    {
+      "check": "luna_supported_answer_and_citations",
+      "passed": true,
+      "model": "gpt-6-luna"
+    },
+    {
+      "check": "luna_citation_quote_and_keyboard_focus",
+      "passed": true,
+      "model": "gpt-6-luna"
+    },
+    {
+      "check": "luna_live_command_clipboard",
+      "passed": true,
+      "model": "gpt-6-luna",
+      "command": "kubectl describe pod POD_NAME -n NAMESPACE"
+    },
+    {
+      "check": "luna_export_exact_quotes_and_provenance",
+      "passed": true,
+      "model": "gpt-6-luna"
+    },
+    {
+      "check": "luna_mobile_answer_no_overflow",
+      "passed": true,
+      "model": "gpt-6-luna"
+    },
+    {
+      "check": "luna_benchmark_current_and_complete",
+      "passed": true,
+      "model": "gpt-6-luna"
+    },
+    {
+      "check": "luna_browser_no_javascript_errors",
+      "passed": true,
+      "model": "gpt-6-luna",
+      "errors": []
+    },
+    {
+      "check": "empty_optional_limitation_has_no_blank_notice",
+      "passed": true,
+      "method": "replayed live answer with optional text cleared"
+    },
+    {
+      "check": "empty_optional_limits_section_omitted_from_export",
+      "passed": true,
+      "method": "same replay"
     }
-  ]
+  ],
+  "passed": 49,
+  "total": 49
 }

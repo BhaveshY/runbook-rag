@@ -1,0 +1,76 @@
+{
+  "created_at": "2026-10-22T13:29:32.356704+00:00",
+  "method": "Chromium with axe-core 4.10.3, WCAG 2 A/AA and 2.1 AA rule tags, on desktop and mobile. Answer fixture replays a measured answer and adds a second real quotation to exercise grouping. CSP bypass enabled only to load the scanner. Automated scanning is not a complete accessibility audit.",
+  "scenarios": [
+    {
+      "check": "axe_wcag_scan_1440_investigate",
+      "passed": true,
+      "violations": [],
+      "automated_rules_passed": 23
+    },
+    {
+      "check": "axe_wcag_scan_1440_benchmark",
+      "passed": true,
+      "violations": [],
+      "automated_rules_passed": 25
+    },
+    {
+      "check": "axe_wcag_scan_1440_sources",
+      "passed": true,
+      "violations": [],
+      "automated_rules_passed": 18
+    },
+    {
+      "check": "repeated_source_citations_grouped_with_both_quotes",
+      "passed": true
+    },
+    {
+      "check": "grouped_citation_export_preserves_each_quote",
+      "passed": true
+    },
+    {
+      "check": "axe_wcag_scan_1440_answer",
+      "passed": true,
+      "violations": [],
+      "automated_rules_passed": 27
+    },
+    {
+      "check": "axe_wcag_scan_390_investigate",
+      "passed": true,
+      "violations": [],
+      "automated_rules_passed": 27
+    },
+    {
+      "check": "axe_wcag_scan_390_benchmark",
+      "passed": true,
+      "violations": [],
+      "automated_rules_passed": 26
+    },
+    {
+      "check": "axe_wcag_scan_390_sources",
+      "passed": true,
+      "violations": [],
+      "automated_rules_passed": 18
+    },
+    {
+      "check": "axe_wcag_scan_390_answer",
+      "passed": true,
+      "violations": [],
+      "automated_rules_passed": 27
+    },
+    {
+      "check": "axe_wcag_scan_1440_api_docs",
+      "passed": true,
+      "violations": [],
+      "automated_rules_passed": 16
+    },
+    {
+      "check": "axe_wcag_scan_390_api_docs",
+      "passed": true,
+      "violations": [],
+      "automated_rules_passed": 17
+    }
+  ],
+  "passed": 12,
+  "total": 12
+}

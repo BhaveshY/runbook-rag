@@ -3,10 +3,8 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 const state = {
   result: null,
   sources: [],
-  corpus: null,
   controller: null,
   timer: null,
-  benchmark: null,
 };
 
 function element(tag, className, text) {
@@ -39,19 +37,30 @@ function notify(message) {
   }, 2600);
 }
 function setView(view) {
+  if (!["investigate", "benchmark", "sources"].includes(view))
+    view = "investigate";
   for (const node of $$(".view")) node.hidden = node.id !== `view-${view}`;
-  for (const node of $$(".nav-item"))
+  for (const node of $$(".nav-item")) {
     node.classList.toggle("active", node.dataset.view === view);
+    if (node.dataset.view === view) node.setAttribute("aria-current", "page");
+    else node.removeAttribute("aria-current");
+  }
   $("#page-label").textContent = {
     investigate: "Investigate",
     benchmark: "Evaluation",
     sources: "Source library",
   }[view];
-  location.hash = view === "investigate" ? "" : view;
+  document.title = `Runbook — ${$("#page-label").textContent}`;
   if (view === "benchmark") loadBenchmark();
 }
+window.addEventListener("hashchange", () => setView(location.hash.slice(1)));
 $$(".nav-item").forEach((button) =>
-  button.addEventListener("click", () => setView(button.dataset.view)),
+  button.addEventListener("click", () => {
+    const hash =
+      button.dataset.view === "investigate" ? "" : `#${button.dataset.view}`;
+    if (location.hash === hash) setView(button.dataset.view);
+    else location.hash = hash;
+  }),
 );
 $$("[data-query]").forEach((button) =>
   button.addEventListener("click", () => {
@@ -77,16 +86,17 @@ function renderEvidence(sources) {
   sources.forEach((source, index) => {
     const card = element("article", "source-card");
     card.id = `source-${index}`;
+    card.tabIndex = -1;
     const top = element("div", "source-top");
     top.append(
       element("span", "source-number", String(index + 1).padStart(2, "0")),
       element("h4", "", source.title),
     );
     const details = element("details");
-    details.append(
-      element("summary", "", "Read passage"),
-      element("pre", "", source.text),
-    );
+    const passage = element("pre", "", source.text);
+    passage.tabIndex = 0;
+    passage.setAttribute("aria-label", `${source.title} source passage`);
+    details.append(element("summary", "", "Read passage"), passage);
     card.append(
       top,
       element("p", "source-heading", source.heading),
@@ -102,8 +112,14 @@ function renderEvidence(sources) {
 }
 
 function citations(parent, items) {
+  const grouped = new Map();
   for (const citation of items) {
-    const index = state.sources.findIndex((s) => s.id === citation.source_id);
+    if (!grouped.has(citation.source_id))
+      grouped.set(citation.source_id, new Set());
+    grouped.get(citation.source_id).add(citation.quote);
+  }
+  for (const [sourceId, quotes] of grouped) {
+    const index = state.sources.findIndex((s) => s.id === sourceId);
     if (index < 0) continue;
     const button = element("button", "citation", String(index + 1));
     button.type = "button";
@@ -116,9 +132,10 @@ function citations(parent, items) {
       $$(".source-quote").forEach((node) => node.remove());
       const card = $(`#source-${index}`);
       card.classList.add("highlight");
-      const quote = element("blockquote", "source-quote", citation.quote);
-      card.append(quote);
+      for (const quote of quotes)
+        card.append(element("blockquote", "source-quote", quote));
       card.querySelector("details").open = true;
+      card.focus({ preventScroll: true });
       card.scrollIntoView({
         behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
           ? "instant"
@@ -181,8 +198,12 @@ function renderAnswer(result) {
       list.append(element("li", "", question));
     body.append(list);
   }
-  body.append(element("p", "limitation", result.answer.limitation));
+  if (result.answer.limitation.trim())
+    body.append(element("p", "limitation", result.answer.limitation));
   $("#answer-content").replaceChildren(body);
+  $("#completion-status").textContent = supported
+    ? "Diagnostic note ready. Inspect its citations before acting."
+    : "Investigation complete: insufficient evidence.";
   const trace = $("#trace");
   trace.replaceChildren(
     element(
@@ -222,7 +243,7 @@ function downloadNote() {
   const result = state.result;
   const numbering = new Map(result.sources.map((s, i) => [s.id, i + 1]));
   const refs = (items) =>
-    items.map((c) => `[${numbering.get(c.source_id)}]`).join(" ");
+    [...new Set(items.map((c) => `[${numbering.get(c.source_id)}]`))].join(" ");
   const lines = [
     `# ${result.answer.title}`,
     "",
@@ -245,19 +266,34 @@ function downloadNote() {
       `${check.expected_signal} ${refs(check.citations)}`,
       "",
     );
-  lines.push(
-    "## Limits",
-    "",
-    result.answer.limitation,
-    "",
-    ...result.answer.follow_up.map((q) => `- ${q}`),
-    "",
-    "## Sources",
-    "",
-  );
+  if (result.answer.limitation.trim() || result.answer.follow_up.length)
+    lines.push(
+      "## Limits",
+      "",
+      result.answer.limitation,
+      "",
+      ...result.answer.follow_up.map((q) => `- ${q}`),
+      "",
+    );
+  lines.push("## Sources", "");
   result.sources.forEach((s, i) =>
     lines.push(`${i + 1}. [${s.title} — ${s.heading}](${s.source_url})`),
   );
+  lines.push("", "## Cited excerpts", "");
+  const seen = new Set();
+  for (const item of [...result.answer.claims, ...result.answer.checks]) {
+    for (const citation of item.citations) {
+      const identity = `${citation.source_id}:${citation.quote}`;
+      if (seen.has(identity)) continue;
+      seen.add(identity);
+      lines.push(
+        `[${numbering.get(citation.source_id)}]`,
+        "",
+        ...citation.quote.split("\n").map((line) => `> ${line}`),
+        "",
+      );
+    }
+  }
   lines.push(
     "",
     `Corpus: ${result.corpus_id}`,
@@ -286,6 +322,8 @@ async function readEvents(response, onEvent) {
       buffer += done
         ? decoder.decode()
         : decoder.decode(value, { stream: true });
+      if (buffer.length > 524288)
+        throw new Error("The server response is too large. Please retry.");
       buffer = buffer.replace(/\r\n/g, "\n");
       let boundary;
       while ((boundary = buffer.indexOf("\n\n")) !== -1) {
@@ -306,6 +344,7 @@ async function readEvents(response, onEvent) {
       if (done) break;
     }
   } finally {
+    await reader.cancel().catch(() => {});
     reader.releaseLock();
   }
 }
@@ -320,7 +359,14 @@ $("#incident-form").addEventListener("submit", async (event) => {
     return;
   }
   state.controller = new AbortController();
+  const controller = state.controller;
   state.result = null;
+  $("#completion-status").textContent = "";
+  $("#incident").readOnly = true;
+  $("#mode").disabled = true;
+  $$("[data-query]").forEach((button) => {
+    button.disabled = true;
+  });
   $("#error").hidden = true;
   $("#answer-panel").hidden = true;
   $("#empty-state").hidden = true;
@@ -335,9 +381,8 @@ $("#incident-form").addEventListener("submit", async (event) => {
     $("#elapsed").textContent =
       `${((performance.now() - started) / 1000).toFixed(1)}s`;
   }, 100);
-  let complete = false,
-    streamError = false;
-  const timeout = setTimeout(() => state.controller?.abort("timeout"), 75000);
+  let complete = false;
+  const timeout = setTimeout(() => controller.abort("timeout"), 75000);
   try {
     const headers = { "Content-Type": "application/json" };
     if ($("#access-token").value)
@@ -346,7 +391,7 @@ $("#incident-form").addEventListener("submit", async (event) => {
       method: "POST",
       headers,
       body: JSON.stringify({ query, mode: $("#mode").value }),
-      signal: state.controller.signal,
+      signal: controller.signal,
     });
     if (!response.ok) {
       if (response.status === 401) $("#access-row").hidden = false;
@@ -363,29 +408,35 @@ $("#incident-form").addEventListener("submit", async (event) => {
       if (name === "evidence") renderEvidence(payload.sources);
       if (name === "status" && payload.stage === "generating")
         $("#progress-text").textContent =
-          "Writing a note grounded in these passages…";
+          "Writing and reviewing a note against these passages…";
       if (name === "answer") {
         renderAnswer(payload);
         complete = true;
       }
       if (name === "error") {
-        streamError = true;
         throw new Error(payload.message);
       }
     });
-    if (!complete && !streamError)
+    if (!complete)
       throw new Error(
         "The connection ended before an answer arrived. Please retry.",
       );
   } catch (error) {
-    $("#error").textContent = state.controller?.signal.aborted
-      ? "Investigation stopped. Retrieved evidence remains available."
+    $("#error").textContent = controller.signal.aborted
+      ? controller.signal.reason === "timeout"
+        ? "The investigation timed out. Retrieved evidence remains available; please retry."
+        : "Investigation stopped. Retrieved evidence remains available."
       : error.message;
     $("#error").hidden = false;
   } finally {
     clearInterval(state.timer);
     clearTimeout(timeout);
     state.controller = null;
+    $("#incident").readOnly = false;
+    $("#mode").disabled = false;
+    $$("[data-query]").forEach((button) => {
+      button.disabled = false;
+    });
     $("#progress").hidden = true;
     $("#submit").hidden = false;
     $("#cancel").hidden = true;
@@ -417,6 +468,15 @@ function renderBenchmark(report) {
   if (report.status === "not_run") {
     root.append(element("p", "method-note", report.message));
     return;
+  }
+  if (report.compatibility && !report.compatibility.matches_running_instance) {
+    const warning = element(
+      "p",
+      "error-box",
+      `Historical measurement: this report differs from the running instance (${report.compatibility.differences.join(", ")}). Rerun evaluation before using these numbers for this instance.`,
+    );
+    warning.setAttribute("role", "status");
+    root.append(warning);
   }
   const primaryMode = report.configuration.default_mode || "hybrid";
   const hybrid = report.retrieval[primaryMode];
@@ -459,6 +519,9 @@ function renderBenchmark(report) {
     table = element("table"),
     thead = element("thead"),
     header = element("tr");
+  wrap.tabIndex = 0;
+  wrap.setAttribute("role", "region");
+  wrap.setAttribute("aria-label", "Retrieval strategy comparison");
   for (const label of [
     "Strategy",
     "Evidence recall @ 5",
@@ -511,7 +574,7 @@ function renderBenchmark(report) {
     const a = report.answers,
       box = panel(
         "Answer evaluation",
-        "Generated answers are checked for exact source quotes. A separate model judges whether cited evidence supports each retained claim; this is a proxy, not a correctness guarantee.",
+        "Generated answers are checked for exact source quotes and reviewed for support. A separate evaluation model judges retained claims and diagnostic checks; this is a proxy, not a correctness guarantee.",
       );
     const cards = element("div", "metric-grid panel-body");
     cards.append(
@@ -528,16 +591,32 @@ function renderBenchmark(report) {
       metric(
         "ABSTENTION ACCURACY",
         pct(a.abstention_accuracy),
-        `${a.completed} completed answer cases`,
+        `${a.attempted} attempted cases · ${a.failures} failures`,
       ),
       metric(
         "ANSWER LATENCY P95",
         `${(a.p95_ms / 1000).toFixed(1)} s`,
-        "Generation + retrieval; single evaluation run",
+        "Retrieval + generation + review; one evaluation run",
       ),
     );
     box.append(cards);
+    if (a.judged_checks !== undefined) {
+      const coverage = element(
+        "p",
+        "method-note",
+        `Diagnostic check support: ${a.judged_check_support === null ? "not measured" : pct(a.judged_check_support)} across ${a.judged_checks} checks. ${a.addresses_question}/${a.judged_answers} judged answers address the question. Judge failures: ${a.judge_failures}.`,
+      );
+      box.append(coverage);
+    }
     root.append(box);
+  } else {
+    root.append(
+      element(
+        "p",
+        "method-note",
+        "This run measures retrieval only. Answer quality and abstention were not evaluated.",
+      ),
+    );
   }
   const note = panel("What these numbers establish", report.methodology);
   const noteBody = element("div", "panel-body");
@@ -601,10 +680,15 @@ function renderBenchmark(report) {
           : "Holdout",
     );
     button.addEventListener("click", () => {
-      [...filter.children].forEach((b) => b.classList.remove("active"));
+      [...filter.children].forEach((b) => {
+        b.classList.remove("active");
+        b.setAttribute("aria-pressed", "false");
+      });
       button.classList.add("active");
+      button.setAttribute("aria-pressed", "true");
       showCases(split);
     });
+    button.setAttribute("aria-pressed", String(split === "all"));
     filter.append(button);
   }
   showCases("all");
@@ -613,13 +697,11 @@ function renderBenchmark(report) {
 }
 
 async function loadBenchmark() {
-  if (state.benchmark) return;
   $("#benchmark-content").textContent = "Loading measured results…";
   try {
     const response = await fetch("/api/benchmark");
     if (!response.ok) throw new Error("Could not load the evaluation report.");
-    state.benchmark = await response.json();
-    renderBenchmark(state.benchmark);
+    renderBenchmark(await response.json());
   } catch (error) {
     $("#benchmark-content").textContent = error.message;
   }
@@ -683,9 +765,11 @@ async function initialize() {
         "OpenAI is not configured on this instance. Ask the operator to set the server API key.";
       $("#error").hidden = false;
     }
+  } else {
+    $("#service-status").textContent = "Service unavailable";
   }
   if (corpusResult.status === "fulfilled") {
-    const corpus = (state.corpus = corpusResult.value);
+    const corpus = corpusResult.value;
     $("#version-tag").textContent = `KUBERNETES ${corpus.version}`;
     $("#sidebar-version").textContent = `v${corpus.version} · official docs`;
     $("#corpus-summary").textContent =
@@ -699,7 +783,6 @@ async function initialize() {
       "The documentation index is unavailable. Ask the operator to run ingestion.";
     $("#error").hidden = false;
   }
-  if (["benchmark", "sources"].includes(location.hash.slice(1)))
-    setView(location.hash.slice(1));
 }
+setView(location.hash.slice(1));
 initialize();

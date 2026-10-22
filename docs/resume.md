@@ -1,20 +1,21 @@
 # Resume wording and interview notes
 
-A defensible bullet, using the committed measurement rather than a target:
+Use the committed measurements, with their scope:
 
-> Built Runbook, a Kubernetes RAG troubleshooting tool with BM25–semantic retrieval, reciprocal rank fusion, and LLM reranking over 773 versioned documentation passages; measured 87.5% evidence recall@5 versus 70.3% for BM25 on a 32-question curated benchmark, with 1.71-second p95 retrieval.
+> Built Runbook, a Kubernetes troubleshooting RAG application combining BM25, semantic search, reciprocal rank fusion, and LLM reranking over 773 versioned documentation passages; measured 87.5% evidence recall@5 versus 70.3% for BM25 on a 32-question curated benchmark, with 3.13-second p95 retrieval.
 
 A second bullet if space permits:
 
-> Implemented streamed evidence, source-linked diagnostics, exact-quote validation, and bounded provider fallback; verified live API and browser flows and evaluated 22 generated answers, with 35/36 claims supported by a separate model judge.
+> Implemented streamed evidence, exact-quote validation, command filtering, and separate citation-support review; evaluated 22 answers and verified API, browser, package, failure, and cancellation flows end to end without local models.
 
-The word **curated** matters. These are small development measurements with explicit limitations, not production customer results or an independently certified model ranking. The 35/36 score is model-judged cited support, not factual accuracy.
+The word **curated** matters. These are development measurements with explicit limitations. Model-judged support is not factual accuracy; the production reviewer and evaluation judge can share biases.
 
 Be prepared to explain:
 
-1. Why BM25 beat semantic retrieval on this dataset, and why combining rankings alone barely improved recall.
-2. How the reranking stage trades approximately one extra second for passage-level precision, and why a result cap per document affects that tradeoff.
-3. Why a valid verbatim quote can still fail to support every assertion in a claim. H06 in the report is a concrete example.
-4. Why exact vector search is appropriate for a 773-vector corpus, and when its operational tradeoff would change.
-5. Why the bootstrap interval and the non-blind holdout prevent a broad superiority claim.
-6. How immutable source revisions, checksums, atomic index activation, and recorded model/configuration metadata make regressions diagnosable.
+1. Why BM25 outperformed semantic retrieval here, and why ranking fusion alone improved little.
+2. How reranking trades latency for passage precision and how the document cap affects that tradeoff.
+3. Why valid quotations did not justify many generated diagnostic checks, how measurement revealed it, and why a separate reviewer still cannot prove correctness.
+4. Why exact vector search fits a 773-vector corpus.
+5. Why a small non-blind dataset and wide confidence intervals prevent a SOTA claim.
+6. How provider shape validation, index integrity, atomic activation, request budgets, and cancellation affect reliability.
+7. Why actual distribution and browser verification uncovered issues that a successful local import would miss.

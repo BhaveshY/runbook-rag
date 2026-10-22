@@ -1,14 +1,50 @@
 {
-  "timestamp": "2026-10-22T12:30:23Z",
+  "created_at": "2026-10-22T13:54:53.573076+00:00",
+  "method": "Fresh Docker build; non-root read-only container on a loopback port. Native service separately verifies real hosted model requests. No live OpenAI calls from this container.",
   "image": "runbook-rag:verified",
-  "checks": {
-    "image_build": "passed",
-    "http_readiness": 200,
-    "ui": 200,
-    "bm25_search": 200,
-    "provider_failure": 503,
-    "runtime_user": "runbook",
-    "docker_health": "healthy"
-  },
-  "scope": "Container verified for startup, UI, local retrieval and provider failure. Live OpenAI generation was verified on the native service."
+  "scenarios": [
+    {
+      "check": "built_image",
+      "passed": true,
+      "image_id": "sha256:54478030babc8e95ac326df574474182cd0dc5e5c980ea9b88d75b8c99b1809c"
+    },
+    {
+      "check": "unprivileged_user",
+      "passed": true
+    },
+    {
+      "check": "read_only_root_filesystem",
+      "passed": true
+    },
+    {
+      "check": "host_port_bound_to_loopback",
+      "passed": true
+    },
+    {
+      "check": "http_readiness_and_luna_default",
+      "passed": true
+    },
+    {
+      "check": "static_ui_and_api_reference",
+      "passed": true
+    },
+    {
+      "check": "bm25_without_provider_credentials",
+      "passed": true
+    },
+    {
+      "check": "missing_provider_configuration_fails_clearly",
+      "passed": true
+    },
+    {
+      "check": "packaged_report_matches_code_corpus_and_luna_models",
+      "passed": true
+    },
+    {
+      "check": "docker_healthcheck",
+      "passed": true
+    }
+  ],
+  "passed": 10,
+  "total": 10
 }

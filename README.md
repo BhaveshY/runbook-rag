@@ -1,43 +1,44 @@
 # Runbook
 
-**Kubernetes troubleshooting with inspectable evidence and a reproducible RAG evaluation.**
+Kubernetes troubleshooting with cited evidence and a reproducible RAG evaluation.
 
-Paste an incident such as `ImagePullBackOff`, an empty Service endpoint list, or a stale ConfigMap. Runbook retrieves versioned official documentation, writes a concise diagnostic note, and attaches an exact source passage to each retained claim. It suggests read-only checks and asks for missing context. You can inspect citations, compare retrieval strategies, and export the note as Markdown.
+Describe an incident. Runbook retrieves pinned official documentation, produces a concise explanation, and suggests diagnostic commands only when their citations survive validation and a separate support review. It has no cluster access and never executes commands.
 
 ![Runbook workspace](docs/workspace.png)
 
 ## Measured results
 
-The committed [full report](eval/results/latest.json) contains every query, retrieval result, failure, model judgment, configuration, and timing. These are measurements from an actual run against OpenAI, not target numbers.
+The [current report](eval/results/latest.json) contains every question, retrieved source, failure, citation decision, and model verdict. These are measurements from real OpenAI calls on the current Python implementation.
 
 | Strategy | Evidence recall@5 | Document recall@5 | MRR@5 | Retrieval p95 |
 |---|---:|---:|---:|---:|
-| BM25 | 70.3% | 98.4% | 0.594 | 0.47 ms |
-| Semantic | 59.4% | 100% | 0.547 | 410 ms |
-| Hybrid / RRF | 71.9% | 98.4% | 0.564 | 410 ms |
-| **Hybrid + reranking** | **87.5%** | **100%** | **0.781** | **1,713 ms** |
+| BM25 | 70.3% | 98.4% | 0.594 | 0.44 ms |
+| Semantic | 59.4% | 100.0% | 0.547 | 514 ms |
+| Hybrid / RRF | 71.9% | 98.4% | 0.564 | 514 ms |
+| **Hybrid + reranking** | 87.5% | 100.0% | 0.859 | 3,127 ms |
 
-32 answerable questions, 8 abstention cases, 28 official documents, 773 passages. Reranked recall's 95% bootstrap interval is **75.0–96.9%**. The paired recall improvement over BM25 is **17.2 percentage points**, with a wide 95% interval of **0–34.4 points**. The fixed holdout partition scores **75.0%** evidence recall; development scores **100%**.
+32 answerable questions, 8 abstention cases, 28 official documents, 773 passages. Reranked recall's 95% bootstrap interval is **75.0%–96.9%**. The paired recall uplift over BM25 is **17.2 percentage points**, with a 95% interval of **0.0–34.4 points**. Development recall is **100.0%**; the fixed holdout scores **75.0%**.
 
-On the 22 cases selected for answer evaluation:
+On the 22 answer-evaluation cases:
 
-- **22/22** requests completed and made the expected answer/abstention decision, including **8/8** unsupported cases.
-- **79/81** generated citations passed exact-quote validation before filtering.
-- A separate `gpt-5.5` judge marked **35/36** retained claims as supported by their cited evidence.
-- **6.49 s** p95 for the full answer pipeline; no answer-result cache.
+- **21/22** completed; answer/abstention agreement was **95.5%**, including all 8 unsupported cases.
+- **27/27** generated citations matched exact source text before filtering.
+- A separate evaluation request judged **22/22** retained claims and **1/2** diagnostic checks supported by their cited passages. One support-review request failed; its answer was withheld. The rejected check added a namespace flag that its quote did not document.
+- Production support review removed **0 observations and 0 checks** after quote/command validation.
+- Full answer-pipeline p95 was **7.33 seconds**, including review, without an answer cache.
 
-This is a small, author-curated benchmark created with AI assistance. The holdout is **not blind**: initial results were inspected before adding reranking. Treat the scores as exploratory engineering evidence, not an independent SOTA claim. Citation matching establishes provenance; it does not prove semantic support. The remaining unsupported claim and all retrieval misses stay in the report. [Methodology and limitations →](docs/evaluation.md)
+This is a small, author-curated dataset made with AI assistance. The holdout is **not blind**. Production review uses `gpt-6-luna`; evaluation uses a separate `gpt-6.1-sol` judge. Models from the same provider can share errors; the scores are not independent expert adjudication or an industry SOTA claim. All remaining misses stay visible. [Methodology and limitations →](docs/evaluation.md)
 
 ## Run it
 
-Requires Python 3.12+, [uv](https://docs.astral.sh/uv/), and an OpenAI project with access to the configured models. All embeddings and language models run through OpenAI; no local model downloads are needed.
+Requires Python 3.12+, [uv](https://docs.astral.sh/uv/), and access to the configured OpenAI models. Embeddings and language models run remotely; there are no local model downloads.
 
 From the project directory:
 
 ```bash
 uv sync --frozen
 
-# Bash: enter the key without displaying it or saving it in shell history.
+# Bash: read the key without displaying it or saving it in shell history.
 read -rsp 'OpenAI API key: ' OPENAI_API_KEY
 export OPENAI_API_KEY
 
@@ -45,9 +46,9 @@ uv run python -m runbook ingest
 uv run python -m runbook serve
 ```
 
-Open **http://127.0.0.1:8000**. Ingestion downloads documentation at the exact upstream commit in [data/sources.json](data/sources.json), embeds it, and writes an immutable index. The initial index used 170,331 embedding tokens. Re-running ingestion with unchanged inputs reuses it without another embedding call.
+Open **http://127.0.0.1:8000**. Ingestion downloads the exact documentation revision in [data/sources.json](data/sources.json), embeds it, and atomically activates a checksummed index. The initial corpus used 170,331 embedding tokens. Re-running unchanged ingestion validates and reuses the generation.
 
-The [environment example](.env.example) documents configuration. If you use an ignored `.env`, load it explicitly with `uv run --env-file .env python -m runbook serve`. Keys are server-side only. The browser never needs the OpenAI key.
+[.env.example](.env.example) documents configuration. To load an ignored `.env` explicitly: `uv run --env-file .env python -m runbook serve`. Credentials remain server-side. `RUNBOOK_DATA_DIR` and `RUNBOOK_EVAL_REPORT` override corpus and report locations. A built Python wheel includes the UI and source/evaluation definitions; when installed outside a checkout, mutable data defaults to the current working directory.
 
 ## How it works
 
@@ -58,59 +59,58 @@ flowchart LR
     E --> D[Exact cosine search]
     B --> F[Reciprocal rank fusion]
     D --> F
-    F --> R[Optional nano-model reranking]
+    F --> R[Optional hosted reranking]
     R --> C[8 evidence passages]
     C --> UI[Evidence streamed to browser]
     C --> G[Structured diagnostic note]
-    G --> V[Quote and command validation]
-    V --> A[Cited answer or abstention]
+    G --> V[Exact quote and command validation]
+    V --> S[Separate citation-support review]
+    S --> A[Cited answer or abstention]
 ```
 
-- **Heading-aware chunks with provenance.** Every passage retains its document, section, version, raw-source checksum, and immutable GitHub line link. Corpus files are checked against their SHA-256 hashes at startup.
-- **Four inspectable retrieval modes.** BM25 preserves error identifiers; semantic retrieval handles paraphrases; RRF merges their rankings. The default reranker orders 30 candidates using `gpt-5.4-nano`. A two-passages-per-document cap limits redundancy in the final context.
-- **Explicit latency tradeoff.** Select “Hybrid · faster search” to omit reranking. A 12-second reranker deadline falls back to hybrid ordering and records the degradation in the response trace and UI.
-- **Evidence before prose.** Server-sent events deliver retrieved passages while `gpt-5.4-mini` prepares the answer. The note is released after citation validation, rather than token-streaming unchecked claims.
-- **Constrained output.** Strict JSON schemas, unknown-source rejection, exact-quote matching, an allowlist for displayed `kubectl` commands, and abstention when the answer has no valid claims. Commands are never executed by Runbook.
-- **Small operational footprint.** FastAPI, NumPy, HTTPX, and a buildless browser UI. For 773 vectors, an in-memory exact search is simpler and smaller than operating a vector database. The float32 vector matrix is approximately 2.3 MiB.
+- **Traceable evidence.** Heading-aware passages retain document, section, version, raw-source checksum, and immutable GitHub line links. Startup and cache reuse validate index integrity.
+- **Inspectable retrieval.** BM25, semantic search, hybrid RRF, and hybrid with `gpt-6-luna` reranking share one corpus. The reranker considers 30 candidates; final context is capped at two passages per document. Duplicate rankings are repaired when possible; failures visibly fall back to hybrid.
+- **Reviewed answers.** `gpt-6-luna` generates a strict schema. Exact quote matching and a conservative command allowlist precede a separate `gpt-6-luna` support review. Unsupported items are removed; failed review returns an error. These checks reduce risk without proving correctness.
+- **Useful interaction.** Evidence arrives before the note. Citation inspection shows all attached quotations and moves keyboard focus to the source. Export includes exact quoted excerpts and immutable links. Cancellation preserves retrieved evidence.
+- **Small footprint.** FastAPI, HTTPX, NumPy, and a buildless UI. The 773-vector matrix is approximately 2.3 MiB; an exact in-memory search avoids a separate vector database.
 
-See [architecture and tradeoffs](docs/architecture.md). The self-hosted API reference is at `/docs`; the OpenAPI schema is at `/openapi.json`.
+[Architecture and tradeoffs](docs/architecture.md) explain the boundaries. `/docs` hosts the API reference; `/openapi.json` exposes the schema.
+
+## Model cost
+
+All serving language-model calls use `gpt-6-luna`. The [published standard price](https://developers.openai.com/api/docs/pricing), checked October 22, 2026, is **$0.10 input / $0.50 output per million tokens**. An uncached reranked answer can use four API requests: one embedding, reranking, generation, and support review. Actual cost depends on passage length and output size; model age alone does not determine value. `gpt-6.1-sol` is used only for separate answer evaluation, at its own higher price. Traces record token usage per stage.
 
 ## Reproduce the evaluation
 
 ```bash
-# Retrieval ablations, including model-based reranking
 uv run python -m runbook evaluate
-
-# Also generate answers and judge their cited support (additional API usage)
 uv run python -m runbook evaluate --answers
-
-# A reporting partition or a separate output file
 uv run python -m runbook evaluate --split holdout --output eval/results/holdout.json
 ```
 
-The evaluator validates gold labels against the indexed source text before making paid calls. It measures passage recall, document recall, MRR, nDCG, cold-query latency, bootstrap intervals, exact quotation, model-judged support, and abstention. Semantic, hybrid, and reranked retrieval share each query embedding and are each charged its measured latency; the cache cannot make one baseline look faster.
+The first command measures retrieval, including paid reranking. `--answers` also generates answers, reviews support, and makes separate evaluation-judge calls. Labels are validated against the indexed text before paid requests. The evaluator records passage/document recall, MRR, nDCG, cold-query latency, bootstrap intervals, quote validity, claim/check support, review removals, and abstention.
 
-`eval/results/latest.json` powers the Evaluation screen. [The original run](eval/results/initial-hybrid.json) and [development reranking experiment](eval/results/rerank-dev-experiment.json) are preserved. No labels were revised to turn observed retrieval misses into hits.
+The Evaluation screen labels a report as historical whenever its code, dataset, corpus, or model configuration differs from the running instance. It refreshes on navigation. Earlier experiments remain in Git history; the working tree keeps the current report.
 
 ## End-to-end verification
 
-Verification uses the running service and Chromium, with real OpenAI calls. **No unit or integration test files or test framework are included.** The evaluation runner is the project's measurement tool.
+Verification exercises running services, Chromium, an installed wheel, and a non-root container. Live-model checks are distinguished from controlled external-provider faults and replayed browser responses. **No unit or integration test suite, test framework, or test files were added to the repository.** Temporary E2E drivers remain outside it.
 
-Verified flows include live diagnosis, evidence arriving before the answer, citation inspection, clipboard copy, Markdown export, all four evaluation modes, the holdout filter, source browsing, unsupported questions, cancellation, mobile layout, request validation, token enforcement, body-size limits, rate limits, request budgets, and provider outages. Recorded outcomes: [HTTP](docs/http-verification.json), [browser](docs/browser-verification.json), and [verification notes](docs/verification.md).
+[Verification records](docs/verification.md) cover navigation/history, four retrieval modes, citation inspection, clipboard/export, cancellation, mobile layouts, accessible controls, malformed upstream responses, retries, review failures and deadlines, quotas, bearer authentication, chunked/slow bodies, corrupt index reuse, concurrency, and package installation. Automated accessibility scans supplement keyboard/browser checks; they are not a complete accessibility audit.
 
-## Container
+## Container and operations
 
-Build **after ingestion** so the generated index is included. Credentials are supplied at runtime and excluded from the image context.
+Build after ingestion to include the generated index. Supply credentials at runtime:
 
 ```bash
 docker build -t runbook .
-docker run --rm -p 8000:8000 -e OPENAI_API_KEY runbook
+docker run --rm -p 127.0.0.1:8000:8000 -e OPENAI_API_KEY runbook
 ```
 
-The process runs as a non-root user. For a shared instance, configure `RUNBOOK_ACCESS_TOKEN` and an account-level OpenAI spending limit. The built-in 20-requests/minute peer limit, daily paid-request budget, and 256-entry query-embedding cache are per process. Multiple workers require shared quotas. The app does not persist incident text; requests sent to OpenAI remain subject to that provider's retention policies even with `store: false`.
+The container runs as an unprivileged user. For a shared deployment, configure `RUNBOOK_ACCESS_TOKEN` and an account-level OpenAI spending limit. The 20-request/minute socket-peer limit, daily paid-request budget, and 256-entry embedding cache are per process; replicas need shared quotas. Serving requests do not persist credentials, incident history, or responses. OpenAI requests use `store: false`; provider retention policies still apply.
 
 ## Scope
 
-The corpus covers **Kubernetes 1.35** core documentation at a pinned revision. Runbook has no access to your cluster and cannot establish its actual root cause. Third-party operators, cloud-specific behavior, and later releases require additional reviewed sources. Hugo presentation includes and linked external examples are not expanded during ingestion.
+The corpus covers **Kubernetes 1.35** core documentation at a pinned revision. It cannot observe a cluster or establish its root cause. Third-party operators, cloud-specific behavior, and newer versions require additional reviewed sources. Hugo presentation includes and linked external examples are not expanded.
 
-Source code: [MIT](LICENSE). Indexed Kubernetes documentation and attributed excerpts: [CC BY 4.0](NOTICE). Independent project; no Kubernetes/CNCF affiliation.
+Code: [MIT](LICENSE). Kubernetes documentation and attributed excerpts: [CC BY 4.0](NOTICE). Independent project; no Kubernetes/CNCF affiliation.
