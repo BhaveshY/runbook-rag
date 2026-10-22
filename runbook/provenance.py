@@ -35,7 +35,13 @@ def report_compatibility(
         if actual is None or actual != expected:
             differences.append(label)
     configuration = report.get("configuration", {})
-    for key in ("model", "rerank_model", "embedding_model", "dimensions"):
+    for key in (
+        "model",
+        "rerank_model",
+        "review_model",
+        "embedding_model",
+        "dimensions",
+    ):
         if configuration.get(key) != getattr(settings, key):
             differences.append(key)
     return {"matches_running_instance": not differences, "differences": differences}

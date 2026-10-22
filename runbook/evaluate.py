@@ -267,6 +267,9 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
                 summary[mode]["fallbacks"] = sum(
                     row.get("rerank_fallback", False) for row in rows
                 )
+                summary[mode]["duplicate_order_repairs"] = sum(
+                    row.get("rerank_duplicates_removed", 0) > 0 for row in rows
+                )
         return summary
 
     report = {
@@ -285,6 +288,7 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
             "dimensions": settings.dimensions,
             "model": settings.model,
             "rerank_model": settings.rerank_model,
+            "review_model": settings.review_model,
             "default_mode": "reranked",
             "rrf_k": 60,
             "candidate_pool": 40,
@@ -301,7 +305,7 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
             "numpy": np.__version__,
             "blas_threads": os.getenv("OPENBLAS_NUM_THREADS", "default"),
         },
-        "methodology": "Evidence recall measures recovery of exact, labeled source passages; document recall measures source-page recovery. MRR measures the rank of the first relevant passage. nDCG rewards first recovery of each gold evidence item. Query embeddings are requested once per question without a cache; the same measured latency is charged to semantic, hybrid, and reranked search. Reranking scores 30 hybrid candidates with a separate model; its latency is included. BM25 requires no API. All outputs use the same top-5 and two-chunks-per-document cap; the rerank candidate pool permits four passages per document. Bootstrap intervals resample questions 2,000 times with a fixed seed. Answer evaluation uses cold query embeddings, serial generation, exact-quote validation, and a separate source-conditioned judge.",
+        "methodology": "Evidence recall measures recovery of exact, labeled source passages; document recall measures source-page recovery. MRR measures the rank of the first relevant passage. nDCG rewards first recovery of each gold evidence item. Query embeddings are requested once per question without a cache; the same measured latency is charged to semantic, hybrid, and reranked search. Reranking scores 30 hybrid candidates with a separate model; its latency is included. BM25 requires no API. All outputs use the same top-5 and two-chunks-per-document cap; the rerank candidate pool permits four passages per document. Bootstrap intervals resample questions 2,000 times with a fixed seed. Answer evaluation uses cold query embeddings, serial generation, exact-quote validation, a production citation-support review, and a separate source-conditioned judge of retained claims and diagnostic checks. Review removals are reported explicitly; latency includes the review.",
         "limitations": [
             "Small, author-curated benchmark: 32 answerable questions and 8 abstention cases. It is not a production workload or an independent SOTA benchmark.",
             "Questions and gold labels were created by the project author with AI assistance. The holdout partition is fixed but not blind: initial holdout results were inspected before adding reranking. The reranker was first measured on development questions. Treat all results as exploratory until externally validated.",
@@ -378,6 +382,14 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
             else 0,
             "claims_removed": sum(a["validation"]["claims_removed"] for a in completed),
             "checks_removed": sum(a["validation"]["checks_removed"] for a in completed),
+            "review_claims_removed": sum(
+                a["retrieval_trace"]["support_review"]["claims_removed"]
+                for a in completed
+            ),
+            "review_checks_removed": sum(
+                a["retrieval_trace"]["support_review"]["checks_removed"]
+                for a in completed
+            ),
         }
     path = Path(output)
     path.parent.mkdir(parents=True, exist_ok=True)
