@@ -32,9 +32,9 @@ This is a small, author-curated benchmark created with AI assistance. The holdou
 
 Requires Python 3.12+, [uv](https://docs.astral.sh/uv/), and an OpenAI project with access to the configured models. All embeddings and language models run through OpenAI; no local model downloads are needed.
 
+From the project directory:
+
 ```bash
-git clone https://github.com/BhaveshY/runbook-rag.git
-cd runbook-rag
 uv sync --frozen
 
 # Bash: enter the key without displaying it or saving it in shell history.
