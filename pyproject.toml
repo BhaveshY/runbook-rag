@@ -17,3 +17,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["runbook"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"web" = "runbook/resources/web"
+"eval/cases.json" = "runbook/resources/eval/cases.json"
+"data/sources.json" = "runbook/resources/data/sources.json"

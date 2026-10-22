@@ -61,6 +61,7 @@ def safe_command(command: str) -> bool:
     if not re.fullmatch(r"[\w\s./:=,'\"?*\-]+", command):
         return False
     import shlex
+
     try:
         words = shlex.split(command)
     except ValueError:
@@ -70,17 +71,47 @@ def safe_command(command: str) -> bool:
     allowed = {"get", "describe", "logs", "top", "events", "explain", "version"}
     if words[1] not in allowed and words[1:3] != ["auth", "can-i"]:
         return False
-    blocked = ("--raw", "--server", "--token", "--client-", "--certificate", "--kubeconfig", "--context", "--as", "--insecure", "--output-watch-events", "--filename", "--kustomize", "--user", "--password")
-    if any(w.startswith(blocked) for w in words[2:]):
-        return False
-    if any(re.match(r"^secrets?(?:$|[/,.=])", w.lower()) or w in ("-s", "-f", "-k") for w in words[2:]):
-        return False
+    flags = {
+        "-n",
+        "--namespace",
+        "-A",
+        "--all-namespaces",
+        "-o",
+        "--output",
+        "-l",
+        "--selector",
+        "--field-selector",
+        "--show-labels",
+        "-c",
+        "--container",
+        "--all-containers",
+        "-p",
+        "--previous",
+        "--tail",
+        "--since",
+        "--timestamps",
+        "--limit-bytes",
+        "--sort-by",
+        "--chunk-size",
+        "--request-timeout",
+        "--no-headers",
+        "--show-kind",
+        "--ignore-not-found",
+    }
+    for word in words[2:]:
+        # Reject credential/resource aliases, comma lists, attached short flags,
+        # and connection overrides. This is deliberately narrower than kubectl.
+        if re.search(r"(?:^|[/,.=])secrets?(?:$|[/,.=])", word, re.I):
+            return False
+        if word.startswith("-") and word.split("=", 1)[0] not in flags:
+            return False
     return True
 
 
 def validate_evidence(answer: Diagnosis, sources: list[dict]) -> tuple[Diagnosis, dict]:
     by_id = {s["id"]: s for s in sources}
     removed_claims, removed_checks, total_citations, valid_citations = 0, 0, 0, 0
+
     def valid(item) -> bool:
         nonlocal total_citations, valid_citations
         valid_all = True
@@ -88,10 +119,15 @@ def validate_evidence(answer: Diagnosis, sources: list[dict]) -> tuple[Diagnosis
             total_citations += 1
             source = by_id.get(citation.source_id)
             quote = normalized(citation.quote)
-            valid = source is not None and 15 <= len(quote) <= 450 and quote in normalized(source["text"])
+            valid = (
+                source is not None
+                and 15 <= len(quote) <= 450
+                and quote in normalized(source["text"])
+            )
             valid_citations += int(valid)
             valid_all = valid_all and valid
         return valid_all
+
     claims, checks = [], []
     for claim in answer.claims:
         if valid(claim):
@@ -109,23 +145,60 @@ def validate_evidence(answer: Diagnosis, sources: list[dict]) -> tuple[Diagnosis
         answer.claims, answer.checks = [], []
         if removed_claims:
             answer.limitation = "The generated claims did not pass exact-source citation validation. Review the retrieved evidence or provide more incident details."
-    return answer, {"citations_checked": total_citations, "exact_quotes_valid": valid_citations, "claims_removed": removed_claims, "checks_removed": removed_checks, "semantic_support": "not automatically guaranteed"}
+    return answer, {
+        "citations_checked": total_citations,
+        "exact_quotes_valid": valid_citations,
+        "claims_removed": removed_claims,
+        "checks_removed": removed_checks,
+        "semantic_support": "not automatically guaranteed",
+    }
 
 
-async def diagnose(retriever: Retriever, query: str, mode: str, k: int = 8, sources=None, retrieval_trace=None) -> dict:
+async def diagnose(
+    retriever: Retriever,
+    query: str,
+    mode: str,
+    k: int = 8,
+    sources=None,
+    retrieval_trace=None,
+) -> dict:
     start = perf_counter()
     if sources is None:
         sources, retrieval_trace = await retriever.search(query, mode, k)
-    context = [{"source_id": s["id"], "title": s["title"], "section": s["heading"], "text": s["text"]} for s in sources]
+    context = [
+        {
+            "source_id": s["id"],
+            "title": s["title"],
+            "section": s["heading"],
+            "text": s["text"],
+        }
+        for s in sources
+    ]
     generation_start = perf_counter()
     try:
-        raw, usage = await retriever.provider.structured(SYSTEM, json.dumps({"incident": query, "sources": context}, ensure_ascii=False), Diagnosis.model_json_schema(), "diagnosis")
+        raw, usage = await retriever.provider.structured(
+            SYSTEM,
+            json.dumps({"incident": query, "sources": context}, ensure_ascii=False),
+            Diagnosis.model_json_schema(),
+            "diagnosis",
+        )
         answer = Diagnosis.model_validate(raw)
     except ValidationError:
-        raise ProviderError("The answer did not match the required evidence format. Please retry.") from None
+        raise ProviderError(
+            "The answer did not match the required evidence format. Please retry."
+        ) from None
     answer, validation = validate_evidence(answer, sources)
     return {
-        "query": query, "answer": answer.model_dump(), "sources": sources,
-        "trace": {**(retrieval_trace or {}), "generation_ms": round((perf_counter() - generation_start) * 1000, 2), "total_ms": round((perf_counter() - start) * 1000, 2), "usage": usage, "validation": validation},
-        "corpus_id": retriever.index.manifest["corpus_id"], "version": retriever.index.manifest["version"],
+        "query": query,
+        "answer": answer.model_dump(),
+        "sources": sources,
+        "trace": {
+            **(retrieval_trace or {}),
+            "generation_ms": round((perf_counter() - generation_start) * 1000, 2),
+            "total_ms": round((perf_counter() - start) * 1000, 2),
+            "usage": usage,
+            "validation": validation,
+        },
+        "corpus_id": retriever.index.manifest["corpus_id"],
+        "version": retriever.index.manifest["version"],
     }
