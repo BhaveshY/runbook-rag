@@ -1,47 +1,60 @@
 # Architecture and decisions
 
-## Offline index
+## Build the index offline
 
-`data/sources.json` pins 28 Kubernetes documentation paths to a full upstream Git commit. Ingestion caches raw Markdown, removes presentation markup, groups lines under section headings, and splits long sections at paragraph boundaries. Fenced code blocks stay together. Titles and headings travel with each passage; there are no overlapping sliding windows.
+[data/sources.json](../data/sources.json) pins 28 documentation paths to one full `kubernetes/website` commit. `ingest` caches the raw Markdown, strips Hugo shortcodes and comments, and groups lines under their section headings. It splits a long section at the first blank line after 1,500 characters, or at 2,400 characters if no blank line comes first. It never splits inside a fenced code block. Each passage carries its page title and heading path, and windows do not overlap.
 
-Each passage retains its source checksum, document, section, version, and immutable GitHub line link. OpenAI `text-embedding-3-small` supplies 768-dimensional embeddings, normalized into a float32 NumPy matrix. No model runs locally.
+Each passage keeps its document ID, section, version, raw-source checksum, and a GitHub link to its exact lines. OpenAI `text-embedding-3-small` produces 768-dimensional vectors, which `ingest` normalizes into a float32 NumPy matrix.
 
-An exclusive ingestion lock prevents competing writers. Raw-cache writes and index activation use atomic replacement. New artifacts are staged before a content-addressed generation is activated. Startup verifies checksums, metadata, distinct passage IDs, model/dimension compatibility, matrix shape, and normalized finite vectors. Reuse performs the same validation; a damaged generation cannot be republished as a successful ingestion. Remove the damaged generation directory and rerun ingestion to rebuild it. A failure never advances the current-index pointer.
+The index directory is named by a hash of its passages and embedding settings. `ingest` writes a new generation to a staging directory, renames it into place, and only then rewrites `index/current.json`. A file lock stops two ingestions from running at once. On startup and on reuse, the loader checks file checksums, passage metadata, unique IDs, embedding model and dimensions, matrix shape, and vector norms. A damaged generation fails loudly and never becomes current. To rebuild it, delete its directory and run `ingest` again.
 
-## Retrieval
+## Retrieve with four strategies
 
-BM25 uses `k1=1.2`, `b=0.75`, title + heading + passage tokens, camel-case splitting, and a small English stop-word list. Sparse postings contain precomputed term contributions. Semantic retrieval uses an exact matrix-vector product. With 773 vectors, a vector database would add an unnecessary operational dependency.
+BM25 uses `k1=1.2` and `b=0.75` over title, heading, and passage tokens, with camel-case splitting and a short stop-word list. Postings store precomputed term weights, so a query is a few array additions.
 
-Hybrid retrieval merges each method's top 40 candidates using equal-weight reciprocal rank fusion: `score(chunk) = Σ 1 / (60 + rank)`.
+Semantic search is an exact matrix-vector product. A vector database would add a service to run for a 2.3 MiB matrix.
 
-The default quality path asks `gpt-6-luna` to order up to 30 hybrid candidates, with four passages per document in that candidate pool. Every final strategy caps output at two passages per document. Duplicate indices are removed while preserving order if enough distinct valid results remain. Invalid indices, insufficient results, provider errors, and the 12-second reranking deadline trigger a visible hybrid fallback. Repairs and fallbacks are recorded separately.
+Hybrid search fuses the top 40 results of each method with reciprocal rank fusion, `score = Σ 1 / (60 + rank)`. The constants live at the top of [retrieval.py](../runbook/retrieval.py), and the evaluation report reads the same values.
 
-Query embeddings use a bounded 256-entry in-memory LRU cache keyed by a query hash. Generation results are not cached. The benchmark requests cold embeddings and charges the same measured embedding latency to each semantic strategy.
+The default mode sends 30 hybrid candidates, at most four per page, to `gpt-6-luna` and asks for the 16 most useful in order. The server removes duplicate indices if enough distinct ones remain. An invalid order, too few results, a provider error, or the 12-second deadline makes it fall back to hybrid order. The trace records repairs and fallbacks separately. Every mode returns at most two passages per page.
 
-## Answer contract
+A 256-entry LRU cache keyed by query hash holds query embeddings. The server never caches generated answers. The evaluator bypasses the cache and charges the same embedding latency to each semantic mode.
 
-`gpt-6-luna` receives the incident and eight retrieved passages. It returns a strict schema containing a status, title, atomic observations, optional diagnostic checks, follow-up questions, and uncertainty. Each observation and check cites source IDs and exact quotations.
+## Check every answer before release
 
-The release path has three steps:
+`gpt-6-luna` receives the incident and eight passages and returns a strict schema: a status, a title, up to four statements, up to three diagnostic checks, follow-up questions, and a limitation. Every statement and check cites a passage ID and an exact quote.
 
-1. Verify that each cited ID belongs to the retrieved context and that each 15–450-character quote occurs in that passage after whitespace normalization. Remove an item if any of its quotations fails.
-2. Apply a conservative command/flag allowlist. Reject shell syntax, mutation verbs, connection overrides, attached short flags, and secret resource aliases or comma lists. Commands are displayed only; the application never executes them.
-3. Make a separate `gpt-6-luna` request to review each remaining observation and check against its own quoted evidence. A check's purpose, command, and expected signal all need support. The reviewer may remove items, but cannot invent replacements. If no observations survive, return insufficient evidence. If review fails or exceeds 10 seconds, return a readable provider error with the already-streamed evidence still available.
+The server then runs three checks in order.
 
-The review is a fallible model judgment, not a proof. Its latency, model usage, and removal counts are exposed in the trace. The evaluation uses a separate `gpt-6.1-sol` invocation with low reasoning effort to score retained observations and diagnostic checks. Because review and evaluation use the same provider, their errors can be correlated; this is not independent expert adjudication. Neither invocation can establish an unobserved cluster's actual state.
+1. It confirms each quote is 15 to 450 characters and occurs in the cited passage after whitespace normalization. An item with any failing quote is removed.
+2. It filters commands through a read-only `kubectl` allowlist. Shell syntax, mutating verbs, connection overrides, attached short flags, and any reference to secrets fail. The app displays commands and never runs them.
+3. It sends the remaining items to a separate `gpt-6-luna` request that sees only each item's own quotes. A check needs support for its purpose, its command, and its expected signal. The reviewer can remove items but not add them.
 
-## HTTP and UI
+If no statement survives, the answer becomes a refusal. If the review fails or takes longer than 10 seconds, the user gets an error, and the evidence already streamed to the page stays visible.
 
-FastAPI serves the API and buildless browser UI from one origin. `/api/diagnose/stream` emits status, evidence, then the validated and reviewed answer. Streaming failures use explicit error events. The browser detects incomplete streams, preserves evidence on cancellation, restores form controls, and distinguishes timeout from user cancellation.
+The review is a model's judgment. It lowers the rate of unsupported statements but does not prove any of them. The trace shows its latency, token use, and removals.
 
-Navigation follows browser history and deep links. Citations group multiple quotations from the same source under one button; inspection moves keyboard focus to the source and displays every attached quote. Markdown exports retain the incident, citations, exact quoted excerpts, immutable URLs, and model/corpus provenance. Dynamic content is rendered as text nodes.
+## Serve the API and UI
 
-Request bodies are limited to 16 KiB, including chunked requests, with a 10-second upload deadline. Incidents are limited to 4,000 characters. The service uses four concurrent request slots, request deadlines, bounded provider retries, optional bearer-token authentication, a socket-peer rate limit, and a process-wide paid-request budget. Untrusted forwarding headers cannot change the rate-limit identity. API responses are not cached; security headers include a same-origin CSP. Incident text and credentials are not written to application logs or persistent browser storage.
+FastAPI serves the API and the static UI from one origin. `/api/diagnose/stream` sends server-sent events in a fixed order: status, evidence, status, then the answer or an error. The browser detects a stream that ends early, keeps the evidence when the user cancels, and tells a timeout apart from a cancellation.
 
-The Evaluation screen compares the report's source-code digest, dataset digest, corpus, and model settings with the running instance. Mismatches are visibly labeled as historical measurements. Missing and unreadable reports have distinct states. The evaluator and API share the same configurable report path.
+The UI supports browser history and deep links. Citations from the same passage share one button, and opening one moves keyboard focus to the passage. Markdown export keeps the incident, every quote, the GitHub links, and the model and corpus IDs. The UI inserts all dynamic content as text nodes.
 
-## Distribution and limits
+Request limits:
 
-The Python wheel includes UI assets and the pinned source/evaluation definitions. An installed wheel uses the current working directory for mutable corpus and report files. Source checkouts use the project directory. `RUNBOOK_DATA_DIR` and `RUNBOOK_EVAL_REPORT` override these locations. The Docker image runs as an unprivileged user.
+- Bodies are capped at 16 KiB, including chunked uploads, with a 10-second upload deadline.
+- Incidents are capped at 4,000 characters.
+- Four requests run at once. The rest wait.
+- Each client gets 20 requests per minute, keyed on the socket address so forwarded headers cannot change it.
+- A daily budget caps paid requests for the whole process.
+- An optional bearer token protects the instance.
 
-The quota and cache are per process; multiple replicas need shared quotas. Eight concurrent synthetic requests verify the slot limit and cancellation behavior, not production throughput or an availability SLA. The next quality milestone is independent domain review and a larger blind incident dataset. Additional sources or models require a new evaluation.
+API responses carry `Cache-Control: no-store` and a same-origin content security policy. The server writes no incident text or credentials to logs or browser storage.
+
+The Evaluation screen compares the report's source hash, dataset hash, corpus ID, and model settings with the running instance and labels any mismatch as historical.
+
+## Package and limits
+
+The wheel bundles the UI and the pinned source and evaluation definitions. An installed wheel keeps its index and report in the current directory. A source checkout uses the project directory. `RUNBOOK_DATA_DIR` and `RUNBOOK_EVAL_REPORT` override both. The Docker image runs as UID 10001.
+
+Quotas and caches live in process memory, so replicas need a shared quota service. The next quality step is review by someone who runs Kubernetes in production, and a larger blind set of real incidents. New sources or models need a new evaluation.

@@ -9,8 +9,9 @@ https://github.com/kubernetes/website/blob/8817d358864b70a9710c5ad34f78df6a239be
 
 The ingestion pipeline removes presentation markup, splits text into passages,
 and computes embeddings. Each passage retains its source URL, line range,
-version, and content hash. Evaluation labels and generated diagnostic examples
-include attributed excerpts of this material under CC BY 4.0.
+version, and content hash. Evaluation labels, generated diagnostic examples,
+and the test fixtures in tests/fixtures/docs include attributed excerpts of
+this material under CC BY 4.0.
 
 Runbook is an independent project and is not affiliated with or endorsed by
 the Kubernetes project or the Cloud Native Computing Foundation.

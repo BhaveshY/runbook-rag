@@ -1,38 +1,35 @@
-# End-to-end verification
+# Verification
 
-**170/170 recorded checks passed.** These are individual scenarios and assertions against running applications, not 170 independent workloads. Temporary E2E drivers use real HTTP, Chromium, the installed distribution, and Docker. No unit/integration test suite, test framework, or test files were added to the repository.
+## Automated test
 
-| Recorded checks | Passed |
+[tests/test_e2e.py](../tests/test_e2e.py) runs on every push. It starts the real `ingest` and `serve` commands against a three-page fixture corpus, with a local HTTP server standing in for the OpenAI API, and checks:
+
+- ingestion activates an index and the server reports ready
+- all four retrieval modes return passages, and BM25 ranks the obvious passage first
+- the streamed diagnosis sends evidence before the answer, and its quote occurs in a retrieved passage
+- a missing bearer token, a too-short query, and an oversized body are rejected
+
+It checks behavior, not model quality. The [evaluation card](evaluation.md) covers quality.
+
+## Manual runs before 1.0
+
+Before the automated test existed, scripted runs that were never committed checked the running application in more depth. The JSON records below hold every scenario and its result.
+
+| Record | Passed |
 |---|---:|
-| [Live HTTP and Luna models](http-verification.json) | 16/16 |
+| [Live HTTP with hosted models](http-verification.json) | 16/16 |
 | [Browser interaction](browser-verification.json) | 49/49 |
-| [HTTP failure and concurrency scenarios](reliability-verification.json) | 76/76 |
-| [Accessibility scans and keyboard interactions](accessibility-verification.json) | 12/12 |
+| [Failure and concurrency scenarios](reliability-verification.json) | 76/76 |
+| [Accessibility scans and keyboard use](accessibility-verification.json) | 12/12 |
 | [Installed wheel](package-verification.json) | 7/7 |
 | [Container](container-verification.json) | 10/10 |
 
-## Live hosted models
+**Live models.** Real OpenAI embeddings and `gpt-6-luna` served all four retrieval modes, embedding cache hits, exact citations with line links, a refusal for a secrets question, input limits, security headers, and report compatibility.
 
-The final HTTP checks use real OpenAI embeddings and GPT-6 Luna for reranking, generation, and support review. They exercise all four retrieval modes, repeated-query embedding caching, exact citations and immutable source links, unknown-secret abstention, input limits, security headers, and report compatibility with the running code and models.
+**Browser.** Chromium covered the streamed request, evidence before the answer, citation focus, export, mobile layout, Back and Forward, deep links, cancellation, keyboard submission, clipboard, and 15 overflow checks across five widths. Intercepted responses covered truncated streams, auth errors, and failed readiness. No JavaScript exceptions occurred.
 
-The browser record contains 38 checks from before the model migration plus a fresh Luna pass. That pass verifies the complete streaming request, actual model IDs in the trace, evidence arriving before the reviewed answer, citation focus, export provenance, mobile layout, and the current benchmark. The original interaction pass also covers Back/Forward and deep links, cancellation and recovery, keyboard submission, clipboard, holdout filtering, and 15 overflow combinations across five widths and three screens. Three explicitly intercepted browser responses cover truncated streams, authorization errors, and failed readiness requests. Two additional replays check that empty optional text leaves no blank notice or export section. No browser JavaScript exceptions were observed.
+**Failures.** A controlled stand-in provider returned malformed JSON, bad vectors, retryable errors, quota errors, disconnects, incomplete generations, invalid rerank orders, invalid citations, unsafe commands, and review rejections and timeouts. Request checks covered tokens, budgets, rate limits, spoofed forwarding headers, oversized and chunked bodies, and the upload deadline. Eight concurrent requests confirmed the four-slot limit and that cancellation frees a slot. A corrupt or missing index failed with a clear message.
 
-The [full quality evaluation](../eval/results/latest.json) is separate from these functional checks: 40 retrieval cases and 22 answer cases with a source-conditioned GPT-6.1 Sol judge. It records failures and denominators. E2E success does not establish factual accuracy; the [evaluation card](evaluation.md) describes quality and dataset limitations.
+**Accessibility.** axe-core 4.10.3 with WCAG 2.1 A and AA rules reported no violations on desktop and mobile after contrast and keyboard-scrolling fixes. An automated scan is not a full audit.
 
-## Controlled failure scenarios
-
-The 76 reliability checks run the real application against a controlled external HTTP provider. They do not replace application functions and do not claim to measure hosted-model quality. Scenarios include malformed JSON and vectors, nonfinite/zero embeddings, retries, quota responses, disconnects, incomplete generation, reranking fallback and duplicate repair, invalid citations, command filtering, and support-review rejection or failure.
-
-Request checks cover bearer authentication, budgets, peer rate limits, spoofed forwarding headers, declared/chunked oversized bodies, and the 10-second upload deadline. Corrupt or missing indexes fail clearly; cache reuse cannot silently reactivate damaged artifacts. Missing/unreadable reports have explicit responses and historical measurements are labeled.
-
-Eight concurrent synthetic requests verify the four-request slot limit while readiness remains responsive. Cancellation releases slots, including during support review. A deliberately slow reviewer exercises its 10-second deadline. This is bounded concurrency verification, not a production throughput measurement or availability SLA.
-
-## Accessibility and distribution
-
-Chromium ran axe-core 4.10.3 with WCAG 2 A/AA and 2.1 AA tags on desktop and mobile screens, including the API reference. Scans reported no violations after contrast and scroll-region keyboard fixes. The answer fixture replays a measured answer and adds a second real source quote to exercise grouped citations and export. CSP bypass was enabled only to inject the scanner. Automated scans are not a complete accessibility audit.
-
-The built wheel was installed with dependencies in a separate virtual environment and launched from a temporary working directory. Checks verify the installed import, CLI, bundled source manifest, index reuse, UI assets, API reference, BM25, and workspace report loading.
-
-A fresh Docker image was launched as UID 10001 with a read-only root filesystem, dropped capabilities, and a loopback-only host port. Its readiness, UI, local retrieval, missing-provider error, matching benchmark provenance, and Docker health check passed. Hosted model requests were verified on the native service; this container run did not call OpenAI.
-
-Screenshots show the working application after the Luna switch. The diagnostic and mobile captures replay the actual live response to omit a transient clipboard notice. Runtime data and temporary drivers are excluded from the source checkout. The downloadable ZIP additionally includes the checksummed prebuilt index, while the Git bundle preserves earlier measurements and their source snapshots.
+**Packaging.** The wheel installed into a clean virtual environment and served the UI, API reference, BM25 search, and report from a temporary directory. The Docker image ran as UID 10001 with a read-only root filesystem on a loopback-only port, and passed its health check. The container run made no OpenAI calls.
