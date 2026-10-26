@@ -2,7 +2,7 @@
 
 ## Automated test
 
-[tests/test_e2e.py](../tests/test_e2e.py) runs on every push. It starts the real `ingest` and `serve` commands against a three-page fixture corpus, with a local HTTP server standing in for the OpenAI API, and checks:
+[tests/test_e2e.py](../tests/test_e2e.py) runs on every push. It starts the real `ingest` and `serve` commands against a three-page fixture corpus with the real embedding model. It runs once with a fake `codex` executable and once with a local HTTP server standing in for the OpenAI API. The test PATH excludes any real Codex install. Each run checks:
 
 - ingestion activates an index, a second run reuses it, and the server reports ready
 - all four retrieval modes return passages, and BM25 ranks the obvious passage first
@@ -11,7 +11,7 @@
 
 It checks behavior, not model quality. The [evaluation card](evaluation.md) covers quality.
 
-## Manual runs before 1.0
+## Manual runs before the Codex backend
 
 Before the automated test existed, scripted runs that were never committed checked the running application in more depth. The JSON records below hold every scenario and its result.
 

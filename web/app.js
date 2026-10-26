@@ -760,7 +760,9 @@ async function initialize() {
     $("#access-row").hidden = !health.access_required;
     if (!health.provider_configured) {
       $("#error").textContent =
-        "OpenAI is not configured on this instance. Ask the operator to set the server API key.";
+        health.backend === "codex"
+          ? "The Codex CLI is not installed on this server. Install it and run codex login."
+          : "OpenAI is not configured on this instance. Ask the operator to set the server API key.";
       $("#error").hidden = false;
     }
   } else {

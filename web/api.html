@@ -38,8 +38,9 @@ curl http://localhost:8000/api/diagnose \
           >
           <p>
             Queries: 8–4,000 characters. Modes: reranked (default), hybrid,
-            dense, bm25. Context k: 3–10 (default 8). All modes use OpenAI for
-            answer generation. Never put an OpenAI key in a browser request.
+            dense, bm25. Context k: 3–10 (default 8). Embeddings run on the
+            server. Answer generation calls an OpenAI model through the Codex
+            CLI or the OpenAI API. Never put an OpenAI key in a browser request.
           </p>
         </div>
       </section>
@@ -110,10 +111,10 @@ curl http://localhost:8000/api/diagnose \
             the HTTP status is 200.
           </p>
           <p>
-            Commands are displayed, never executed. Query text is not persisted
-            by Runbook. The server forwards incidents and retrieved
-            documentation to OpenAI with response storage disabled; the
-            provider's retention policy still applies.
+            Runbook displays commands and never runs them, and it stores no
+            query text. The server sends incidents and retrieved documentation
+            to OpenAI, through the Codex CLI or the OpenAI API. With the API, it
+            disables response storage. OpenAI's retention policy still applies.
           </p>
         </div>
       </section>

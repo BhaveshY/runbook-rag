@@ -4,7 +4,7 @@
 
 [data/sources.json](../data/sources.json) pins 28 documentation paths to one full `kubernetes/website` commit. `ingest` caches the raw Markdown, strips Hugo shortcodes and comments, and groups lines under their section headings. It splits a long section at the first blank line after 1,500 characters, or at 2,400 characters if no blank line comes first. It never splits inside a fenced code block. Each passage carries its page title and heading path, and passages do not overlap.
 
-Each passage keeps its document ID, section, version, raw-source checksum, and a GitHub link to its exact lines. OpenAI `text-embedding-3-small` produces 768-dimensional vectors, which `ingest` normalizes into a float32 NumPy matrix.
+Each passage keeps its document ID, section, version, raw-source checksum, and a GitHub link to its exact lines. `BAAI/bge-small-en-v1.5` runs on the CPU through fastembed and produces 384-dimensional vectors, which `ingest` normalizes into a float32 NumPy matrix. A local model means anyone can rebuild the index without an account, and query embeddings cost nothing.
 
 `ingest` names the index directory after a hash of its passages and embedding settings. `ingest` writes a new generation to a staging directory, renames it into place, and only then rewrites `index/current.json`. A file lock stops two ingestions from running at once. On startup and on reuse, the loader checks file checksums, passage metadata, unique IDs, embedding model and dimensions, matrix shape, and vector norms. If any check fails, `ingest` exits with an error and leaves `index/current.json` unchanged, and the server answers 503. To rebuild a damaged generation, delete its directory and run `ingest` again.
 
@@ -12,27 +12,35 @@ Each passage keeps its document ID, section, version, raw-source checksum, and a
 
 BM25 uses `k1=1.2` and `b=0.75` over title, heading, and passage tokens, with camel-case splitting and a short stop-word list. Postings store precomputed term weights, so a query is a few array additions.
 
-Semantic search is an exact matrix-vector product. A vector database would add a service to run, and at 2.3 MiB the matrix fits in memory.
+Semantic search is an exact matrix-vector product. A vector database would add a service to run, and at 1.1 MiB the matrix fits in memory.
 
 Hybrid search fuses the top 40 results of each method with reciprocal rank fusion, `score = Σ 1 / (60 + rank)`. The constants live at the top of [retrieval.py](../runbook/retrieval.py), and the evaluation report reads the same values.
 
-The default mode sends 30 hybrid candidates, at most four per page, to `gpt-6-luna` and asks for the 16 most useful in order. The server removes duplicate indices if enough distinct ones remain. If the reranker returns an invalid order or too few results, the request fails, or 12 seconds pass, the server falls back to hybrid order. The trace records duplicate removals and fallbacks separately. Every mode returns at most two passages per page.
+The default mode sends 30 hybrid candidates, at most four per page, to the serving model and asks for the 16 most useful in order. The server removes duplicate indices if enough distinct ones remain. If the reranker returns an invalid order or too few results, the request fails, or 12 seconds pass, the server falls back to hybrid order. The trace records duplicate removals and fallbacks separately. Every mode returns at most two passages per page.
 
 A 256-entry LRU cache keyed by query hash holds query embeddings. The server never caches generated answers. The evaluator bypasses the cache and charges the same embedding latency to semantic, hybrid, and reranked search.
 
 ## Answers pass three checks before the user sees them
 
-`gpt-6-luna` receives the incident and eight passages and returns a strict schema: a status, a title, up to four statements, up to three diagnostic checks, follow-up questions, and a limitation. Every statement and check cites a passage ID and an exact quote.
+The serving model receives the incident and eight passages and returns a strict schema: a status, a title, up to four statements, up to three diagnostic checks, follow-up questions, and a limitation. Every statement and check cites a passage ID and an exact quote.
 
 The server then runs three checks in order.
 
 1. It confirms each quote is 15 to 450 characters and occurs in the cited passage after whitespace normalization. It removes any item with a failing quote.
 2. It filters commands through a read-only `kubectl` allowlist. Shell syntax, mutating verbs, connection overrides, attached short flags, and any reference to secrets fail. The app displays commands and never runs them.
-3. It sends the remaining items to a separate `gpt-6-luna` request that sees only each item's own quotes. A check needs support for its purpose, its command, and its expected signal. The reviewer can remove items but not add them.
+3. It sends the remaining items to a separate model request that sees only each item's own quotes. A check needs support for its purpose, its command, and its expected signal. The reviewer can remove items but not add them.
 
 If no statement survives, the answer becomes a refusal. If the review fails or takes longer than 10 seconds, the user gets an error, and the evidence already streamed to the page stays visible.
 
-The review is a model's judgment. In the current report it removed nothing that the quote and command checks kept. It can remove items, but it does not prove the remaining ones. The trace shows its latency, token use, and removals.
+The review is a model's judgment. In the current report it removed one check that the quote and command checks had kept. It can remove items, but it does not prove the remaining ones. The trace shows its latency, token use, and removals.
+
+## Two backends serve model calls
+
+`RUNBOOK_BACKEND=codex`, the default, runs each model call as `codex exec` with the request's JSON schema passed as `--output-schema`. The subprocess runs in an empty temporary directory with a read-only sandbox and ignores the user's Codex configuration, so the call answers from the prompt alone. Calls bill to the signed-in ChatGPT plan, which is what lets the project run without an API key. Each call carries about 16,000 tokens of Codex's own instructions and takes a few seconds to start.
+
+`RUNBOOK_BACKEND=openai` sends the same requests to the Responses API with strict JSON schemas, `store: false`, and up to three attempts with backoff. Use it for deployments, where a server cannot hold a personal login.
+
+Both clients expose the same `structured()` call, so retrieval, answer checks, and evaluation do not know which one runs.
 
 ## One origin serves the API and the UI
 
