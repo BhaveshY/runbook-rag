@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Kubernetes troubleshooting with inspectable evidence, precise citations, and a reproducible retrieval benchmark."
+      content="Answers Kubernetes troubleshooting questions from pinned documentation pages and quotes each source word for word."
     />
     <meta name="theme-color" content="#111a18" />
-    <title>Runbook — follow the evidence</title>
+    <title>Runbook</title>
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
     <link rel="stylesheet" href="/assets/style.css" />
     <script type="module" src="/assets/app.js"></script>
@@ -19,7 +19,7 @@
         <a class="brand" href="/" aria-label="Runbook home"
           ><span class="brand-mark">r<span>.</span></span
           ><span
-            >runbook<span class="brand-sub">THE INCIDENT WORKSPACE</span></span
+            >runbook<span class="brand-sub">KUBERNETES DOCS, CITED</span></span
           ></a
         >
         <div class="workspace-label">WORKSPACE <span>01</span></div>
@@ -37,8 +37,8 @@
         <div class="sidebar-note">
           <span class="status-dot"></span> Built on official documentation
           <p>
-            Every answer starts with evidence.<br />Every claim keeps its
-            source.
+            Each statement quotes a pinned passage of the Kubernetes
+            documentation.
           </p>
         </div>
         <div class="sidebar-footer">
@@ -67,11 +67,12 @@
           <div class="page-heading">
             <div>
               <p class="eyebrow">
-                <span class="tiny-cross">+</span> FROM SYMPTOM TO SOURCE
+                <span class="tiny-cross">+</span> CITED TROUBLESHOOTING
               </p>
-              <h1>Follow the evidence.</h1>
+              <h1>Describe the incident.</h1>
               <p class="intro">
-                Describe what broke. Find what the docs actually say.
+                Runbook answers only with quoted passages from the Kubernetes
+                docs.
               </p>
             </div>
             <span class="outline-tag" id="version-tag">KUBERNETES</span>
@@ -192,15 +193,16 @@
                   <span></span><span></span><span></span
                   ><b><span class="arrow-up" aria-hidden="true"></span></b>
                 </div>
-                <h2>A shorter path to a useful next step.</h2>
+                <h2>Ask about a failing pod, Service, or volume.</h2>
                 <p>
-                  Get a source-backed explanation, read-only diagnostic
+                  You get statements that quote the docs, read-only kubectl
                   checks,<br class="desktop-break" />
-                  and a clear account of what remains unknown.
+                  and the questions the docs cannot answer.
                 </p>
                 <div class="principles">
-                  <span><i>01</i> Retrieve</span><span><i>02</i> Ground</span
-                  ><span><i>03</i> Inspect</span>
+                  <span><i>01</i> Search the docs</span
+                  ><span><i>02</i> Quote passages</span
+                  ><span><i>03</i> Check each quote</span>
                 </div>
               </section>
             </div>
@@ -225,7 +227,7 @@
             </aside>
           </div>
           <footer class="page-footer">
-            <span>RETRIEVE. VERIFY. RESOLVE.</span
+            <span>NO CLUSTER ACCESS</span
             ><span
               >Commands are suggestions. Nothing runs against your
               cluster.</span
@@ -236,9 +238,10 @@
           <div class="page-heading">
             <div>
               <p class="eyebrow">MEASURED RETRIEVAL QUALITY</p>
-              <h1>Show the work.</h1>
+              <h1>Evaluation</h1>
               <p class="intro">
-                Same questions. Same corpus. Four retrieval strategies.
+                Recall, MRR, and latency for four retrieval modes on the same
+                questions.
               </p>
             </div>
             <a
@@ -254,11 +257,11 @@
         <section id="view-sources" class="view" hidden>
           <div class="page-heading">
             <div>
-              <p class="eyebrow">A BOUNDED, AUDITABLE CORPUS</p>
-              <h1>Go to the source.</h1>
+              <p class="eyebrow">SOURCE CORPUS</p>
+              <h1>Source library</h1>
               <p class="intro">
-                Official Kubernetes documentation, pinned to an immutable
-                revision.
+                Official Kubernetes documentation, pinned to one upstream
+                commit.
               </p>
             </div>
             <span class="outline-tag">CC BY 4.0</span>

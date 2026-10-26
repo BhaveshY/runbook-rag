@@ -4,7 +4,7 @@
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Runbook answers Kubernetes troubleshooting questions from 28 pinned pages of the official documentation. Every statement in an answer quotes its source word for word. The server drops any statement whose quote it cannot find in the retrieved passage, then asks a second model whether the quote supports the statement. Runbook has no cluster access and never runs commands.
+Runbook answers Kubernetes troubleshooting questions from 28 pinned pages of the official documentation. Every statement in an answer quotes its source word for word. The server drops any statement whose quote it cannot find in the retrieved passage, then sends a second request that asks whether each quote supports its statement. Runbook has no cluster access and never runs commands.
 
 ![Runbook workspace](docs/workspace.png)
 
@@ -25,13 +25,13 @@ For the 22 questions that also go through answer generation:
 
 - 21 completed. One failed when the support review request errored, and the app withheld that answer.
 - All 27 generated quotes matched the source text exactly.
-- The separate judge model found 22 of 22 statements and 1 of 2 suggested commands supported. It rejected the other command because it added a `-n` flag the quoted passage never shows.
+- The separate judge model found 22 of 22 statements and 1 of 2 checks supported. It rejected the other check because its command added a `-n` flag that the quoted passage never shows.
 - All 8 out-of-scope questions were refused.
 - The full pipeline, including review, has a p95 of 7.3 seconds.
 
 I wrote the questions and labels myself with AI help, and I saw holdout results before adding reranking, so the holdout is not blind. The judge comes from the same provider as the serving model and may share its mistakes. [The evaluation card](docs/evaluation.md) covers method and limits.
 
-These figures come from the code at commit `4a95aef`. Later commits restructure the Python without changing retrieval output, but the report pins a hash of the source, so the Evaluation screen labels it historical until you rerun `make evaluate`.
+These figures come from the code at commit `4a95aef`. Later commits restructure the Python without changing retrieval output. The report records a hash of the source code, so the Evaluation screen labels the report historical until you rerun `make evaluate`.
 
 ## How it works
 
@@ -39,7 +39,7 @@ These figures come from the code at commit `4a95aef`. Later commits restructure 
 flowchart LR
     Q[Incident] --> B[BM25]
     Q --> E[Query embedding]
-    E --> D[Exact cosine search]
+    E --> D[Semantic search]
     B --> F[Reciprocal rank fusion]
     D --> F
     F --> R[LLM reranking]
@@ -51,11 +51,11 @@ flowchart LR
     S --> A[Cited answer or refusal]
 ```
 
-**Pinned sources.** `ingest` downloads 28 pages from one `kubernetes/website` commit, splits them at headings, and embeds each passage. Every passage keeps a GitHub link to its exact lines. The index directory is named by its content hash and only becomes active after a checksum pass.
+**Pinned sources.** `ingest` downloads 28 pages from one `kubernetes/website` commit, splits them at headings, and embeds each passage. Every passage keeps a GitHub link to its exact lines. `ingest` names the index directory after its content hash and activates it only after every checksum matches.
 
-**Four retrieval modes.** BM25, cosine search, reciprocal rank fusion of both, and fusion followed by LLM reranking all share one corpus. Reranking orders 30 candidates. If it fails or takes longer than 12 seconds, the server falls back to fusion order and says so in the trace. No mode returns more than two passages from one page. With 773 vectors, a NumPy matrix product replaces a vector database.
+**Four retrieval modes.** BM25, semantic search, reciprocal rank fusion of both, and fusion followed by LLM reranking all share one corpus. Reranking orders 30 candidates. If it fails or takes longer than 12 seconds, the server falls back to fusion order and says so in the trace. No mode returns more than two passages from one page. With 773 vectors, a NumPy matrix product replaces a vector database.
 
-**Checked answers.** The model returns JSON in a strict schema. The server then drops any statement whose quote is missing from the cited passage, and any command outside a read-only `kubectl` allowlist. A second model call checks each remaining quote against its statement. If no statement survives, the user gets a refusal with follow-up questions.
+**Checked answers.** The model returns JSON in a strict schema. The server then drops any statement whose quote is missing from the cited passage, and any command outside a read-only `kubectl` allowlist. A second request checks each remaining quote against its statement. If no statement survives, the user gets a refusal with follow-up questions.
 
 **Streaming UI.** Evidence reaches the browser before the answer. Clicking a citation moves focus to the quoted passage. Export produces Markdown with every quote and link. The UI is plain HTML, CSS, and JavaScript with no build step.
 
@@ -63,7 +63,7 @@ flowchart LR
 
 ## Run it
 
-You need Python 3.12+, [uv](https://docs.astral.sh/uv/), and an OpenAI API key with access to the configured models. Nothing runs locally except BM25 and the vector search.
+You need Python 3.12+, [uv](https://docs.astral.sh/uv/), and an OpenAI API key with access to the configured models. No model runs locally. Embedding, reranking, generation, and review all call OpenAI.
 
 ```bash
 uv sync --frozen
@@ -74,7 +74,7 @@ uv run python -m runbook serve
 
 Open http://127.0.0.1:8000. The first `ingest` embeds about 170,000 tokens. Running it again with unchanged sources reuses the existing index. [.env.example](.env.example) lists every setting.
 
-All serving calls use `gpt-6-luna`, listed at $0.10 per million input tokens and $0.50 per million output tokens on [OpenAI's pricing page](https://developers.openai.com/api/docs/pricing) as of October 22, 2026. One reranked answer makes four requests: embedding, reranking, generation, and review. The trace records token use for each.
+Reranking, generation, and review use `gpt-6-luna`, listed at $0.10 per million input tokens and $0.50 per million output tokens on [OpenAI's pricing page](https://developers.openai.com/api/docs/pricing) as of October 22, 2026. Query embeddings use `text-embedding-3-small`. One reranked answer makes four requests: embedding, reranking, generation, and review. The trace records token use for each.
 
 ## Test
 
@@ -83,9 +83,9 @@ make lint
 make test
 ```
 
-[tests/test_e2e.py](tests/test_e2e.py) runs the real `ingest` and `serve` commands on a three-page fixture corpus, with a small local HTTP server standing in for OpenAI. It then calls every retrieval mode, the streamed diagnosis, and the auth and input limits over HTTP. It needs no API key or network and finishes in about two seconds. CI also builds the wheel and the Docker image.
+[tests/test_e2e.py](tests/test_e2e.py) runs the real `ingest` and `serve` commands on a three-page fixture corpus, with a small local HTTP server standing in for OpenAI. It then calls every retrieval mode and the streamed diagnosis over HTTP, and checks the auth and input limits. It needs no API key or network and finishes in about two seconds. CI also builds the wheel and the Docker image.
 
-Earlier manual runs against live models, Chromium, the installed wheel, and the container are recorded in [docs/verification.md](docs/verification.md).
+[Verification](docs/verification.md) records earlier manual runs against live models, Chromium, the installed wheel, and the container.
 
 ## Evaluate
 
@@ -110,6 +110,6 @@ The container runs as an unprivileged user. For a shared instance, set `RUNBOOK_
 
 ## Scope
 
-The corpus covers Kubernetes 1.35 core documentation. Runbook cannot see your cluster, so it can explain documented behavior and suggest read-only checks, but it cannot name a root cause. Operators, cloud-specific behavior, and other versions need more sources and a new evaluation.
+The corpus covers Kubernetes 1.35 core documentation. Runbook cannot see your cluster, so it can explain documented behavior and suggest read-only checks, but it cannot name a root cause. Kubernetes operators, cloud-provider behavior, and other Kubernetes versions need more sources and a new evaluation.
 
 Code is [MIT](LICENSE). Kubernetes documentation and the excerpts in this repository are [CC BY 4.0](NOTICE). This is an independent project with no Kubernetes or CNCF affiliation.
