@@ -22,7 +22,7 @@ def main():
     evaluate.add_argument(
         "--answers",
         action="store_true",
-        help="Also generate answers and have a separate judge model grade them against the cited passages (paid API calls)",
+        help="Also generate answers and have a separate judge model grade them against the cited passages (uses your Codex plan or API credits)",
     )
     evaluate.add_argument("--split", choices=["dev", "holdout", "all"], default="all")
     evaluate.add_argument("--output", default=str(Settings().report_path))
@@ -35,7 +35,7 @@ def main():
             json.dumps(
                 {
                     key: result[key]
-                    for key in ("corpus_id", "documents", "chunks", "embedding_tokens")
+                    for key in ("corpus_id", "documents", "chunks", "embedding_model")
                 },
                 indent=2,
             )

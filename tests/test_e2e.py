@@ -1,4 +1,3 @@
-import hashlib
 import json
 import os
 import shutil
@@ -8,6 +7,7 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 import httpx
 import pytest
@@ -18,13 +18,6 @@ DOCS = {
     "resources": "content/en/docs/concepts/configuration/manage-resources-containers.md",
 }
 REVISION = "0123456789abcdef0123456789abcdef01234567"
-
-
-def embedding(text: str) -> list[float]:
-    vector = [0.01] * 32
-    for word in text.lower().split():
-        vector[int(hashlib.sha256(word.encode()).hexdigest(), 16) % 32] += 1
-    return vector
 
 
 def diagnosis(request: dict) -> dict:
@@ -65,21 +58,14 @@ ANSWERS = {
 class FakeOpenAI(BaseHTTPRequestHandler):
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-        if self.path.endswith("/embeddings"):
-            rows = [
-                {"index": i, "embedding": embedding(t)}
-                for i, t in enumerate(body["input"])
-            ]
-            reply = {"data": rows, "usage": {"total_tokens": len(rows)}}
-        else:
-            name = body["text"]["format"]["name"]
-            output = ANSWERS[name](json.loads(body["input"][1]["content"]))
-            text = [{"type": "output_text", "text": json.dumps(output)}]
-            reply = {
-                "status": "completed",
-                "model": body["model"],
-                "output": [{"content": text}],
-            }
+        name = body["text"]["format"]["name"]
+        output = ANSWERS[name](json.loads(body["input"][1]["content"]))
+        text = [{"type": "output_text", "text": json.dumps(output)}]
+        reply = {
+            "status": "completed",
+            "model": body["model"],
+            "output": [{"content": text}],
+        }
         payload = json.dumps(reply).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -91,14 +77,27 @@ class FakeOpenAI(BaseHTTPRequestHandler):
         pass
 
 
+FAKE_CODEX = f"""
+import json, sys
+from pathlib import Path
+sys.path.insert(0, {str(Path(__file__).parent)!r})
+from test_e2e import ANSWERS
+name = Path(sys.argv[sys.argv.index("--output-schema") + 1]).stem
+answer = ANSWERS[name](json.loads(sys.stdin.read().rsplit("\\n", 1)[-1]))
+reply = {{"type": "agent_message", "text": json.dumps(answer)}}
+print(json.dumps({{"type": "item.completed", "item": reply}}))
+print(json.dumps({{"type": "turn.completed", "usage": {{"input_tokens": 1}}}}))
+"""
+
+
 def free_port() -> int:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
 
 
-@pytest.fixture(scope="module")
-def app(tmp_path_factory):
+@pytest.fixture(scope="module", params=["codex", "openai"])
+def app(request, tmp_path_factory):
     data = tmp_path_factory.mktemp("data")
     raw = data / "raw" / REVISION
     raw.mkdir(parents=True)
@@ -115,14 +114,22 @@ def app(tmp_path_factory):
             }
         )
     )
+    codex = tmp_path_factory.mktemp("bin") / "codex"
+    (codex.parent / "fake_codex.py").write_text(FAKE_CODEX)
+    codex.write_text(
+        f'#!/bin/sh\nexec "{sys.executable}" "{codex.parent}/fake_codex.py" "$@"\n'
+    )
+    codex.chmod(0o755)
     openai = ThreadingHTTPServer(("127.0.0.1", 0), FakeOpenAI)
     threading.Thread(target=openai.serve_forever, daemon=True).start()
     env = os.environ | {
+        "PATH": f"{codex.parent}{os.pathsep}/usr/bin{os.pathsep}/bin",
+        "RUNBOOK_BACKEND": request.param,
         "RUNBOOK_DATA_DIR": str(data),
+        "RUNBOOK_MODEL_CACHE": str(Path(".pytest_cache/models").resolve()),
         "RUNBOOK_EVAL_REPORT": str(data / "report.json"),
         "OPENAI_API_KEY": "sk-test",
         "OPENAI_BASE_URL": f"http://127.0.0.1:{openai.server_port}/v1",
-        "RUNBOOK_EMBEDDING_DIMENSIONS": "32",
         "RUNBOOK_ACCESS_TOKEN": "token",
     }
     run = [sys.executable, "-m", "runbook"]
@@ -132,7 +139,9 @@ def app(tmp_path_factory):
     port = free_port()
     server = subprocess.Popen([*run, "serve", "--port", str(port)], env=env)
     client = httpx.Client(
-        base_url=f"http://127.0.0.1:{port}", headers={"Authorization": "Bearer token"}
+        base_url=f"http://127.0.0.1:{port}",
+        headers={"Authorization": "Bearer token"},
+        timeout=60,
     )
     for _ in range(100):
         try:

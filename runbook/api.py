@@ -18,7 +18,7 @@ from . import __version__
 from .answer import diagnose
 from .config import RESOURCES, Settings
 from .provenance import report_compatibility
-from .provider import OpenAI, ProviderError
+from .provider import ProviderError, model_client
 from .retrieval import Index, Retriever
 
 settings = Settings()
@@ -26,7 +26,7 @@ settings = Settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.provider = OpenAI(settings)
+    app.state.provider = model_client(settings)
     app.state.retriever = None
     app.state.index_error = None
     try:
@@ -181,7 +181,8 @@ async def health(request: Request):
     return JSONResponse(
         {
             "status": "ready" if ready else "index_missing",
-            "provider_configured": bool(settings.api_key),
+            "provider_configured": request.app.state.provider.configured,
+            "backend": settings.backend,
             "access_required": bool(settings.access_token),
             "model": settings.model,
         },

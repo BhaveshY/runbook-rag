@@ -8,7 +8,8 @@ from time import perf_counter
 import numpy as np
 
 from .config import Settings
-from .provider import OpenAI, ProviderError
+from .embeddings import embed
+from .provider import Codex, OpenAI, ProviderError
 
 RRF_K = 60
 CANDIDATE_POOL = 40
@@ -177,7 +178,7 @@ class Index:
 
 
 class Retriever:
-    def __init__(self, index: Index, provider: OpenAI):
+    def __init__(self, index: Index, provider: OpenAI | Codex):
         self.index, self.provider = index, provider
         self.cache = OrderedDict()
 
@@ -185,7 +186,7 @@ class Retriever:
         self, query: str, mode: str = "hybrid", k: int = 8
     ) -> tuple[list[dict], dict]:
         started = perf_counter()
-        vector, tokens, cache_hit, embed_ms = None, 0, False, 0
+        vector, cache_hit, embed_ms = None, False, 0
         if mode != "bm25":
             cache_key = hashlib.sha256(query.encode()).hexdigest()
             embed_start = perf_counter()
@@ -194,9 +195,9 @@ class Retriever:
                 self.cache.move_to_end(cache_key)
                 cache_hit = True
             else:
-                rows, tokens = await self.provider.embed([query])
-                vector = np.array(rows[0], dtype=np.float32)
-                vector /= max(float(np.linalg.norm(vector)), 1e-12)
+                vector = (
+                    await asyncio.to_thread(embed, [query], self.provider.settings)
+                )[0]
                 self.cache[cache_key] = vector
                 if len(self.cache) > 256:
                     self.cache.popitem(last=False)
@@ -218,7 +219,6 @@ class Retriever:
             "embedding_ms": round(embed_ms, 2),
             "ranking_ms": round(ranking_ms, 2),
             "retrieval_ms": round((perf_counter() - started) * 1000, 2),
-            "embedding_tokens": tokens,
             "embedding_cache_hit": cache_hit,
             **rerank_trace,
         }

@@ -14,7 +14,7 @@ import numpy as np
 import yaml
 
 from .config import RESOURCES, Settings
-from .provider import OpenAI
+from .embeddings import embed
 from .retrieval import load_generation
 
 PIPELINE_VERSION = "heading-lines-v1"
@@ -161,25 +161,11 @@ async def _ingest(settings: Settings) -> dict:
             f"Embedding {len(chunks)} chunks from {len(groups)} pinned documents",
             flush=True,
         )
-        client = OpenAI(settings)
-        gate = asyncio.Semaphore(3)
-
-        async def embed_batch(batch):
-            async with gate:
-                return await client.embed(
-                    [f"{c['title']} > {c['heading']}\n\n{c['text']}" for c in batch]
-                )
-
-        try:
-            results = await asyncio.gather(
-                *(embed_batch(chunks[i : i + 48]) for i in range(0, len(chunks), 48))
-            )
-        finally:
-            await client.close()
-        vectors = np.asarray([v for rows, _ in results for v in rows], dtype=np.float32)
-        if not np.isfinite(vectors).all():
-            raise ValueError("Non-finite embedding returned.")
-        vectors /= np.maximum(np.linalg.norm(vectors, axis=1, keepdims=True), 1e-12)
+        vectors = await asyncio.to_thread(
+            embed,
+            [f"{c['title']} > {c['heading']}\n\n{c['text']}" for c in chunks],
+            settings,
+        )
         staging = Path(tempfile.mkdtemp(prefix=".build-", dir=settings.data_dir))
         try:
             (staging / "chunks.json").write_bytes(serialized)
@@ -195,7 +181,6 @@ async def _ingest(settings: Settings) -> dict:
                 "pipeline": PIPELINE_VERSION,
                 "embedding_model": settings.embedding_model,
                 "dimensions": settings.dimensions,
-                "embedding_tokens": sum(tokens for _, tokens in results),
                 "chunks_sha256": digest(serialized),
                 "vectors_sha256": digest((staging / "vectors.npy").read_bytes()),
                 "sources": [

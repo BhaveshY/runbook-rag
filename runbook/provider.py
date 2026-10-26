@@ -1,7 +1,9 @@
 import asyncio
 import json
-import math
 import random
+import shutil
+import tempfile
+from pathlib import Path
 
 import httpx
 
@@ -26,6 +28,10 @@ class OpenAI:
             limits=httpx.Limits(max_connections=12, max_keepalive_connections=8),
         )
 
+    @property
+    def configured(self) -> bool:
+        return bool(self.settings.api_key)
+
     async def close(self):
         await self.http.aclose()
 
@@ -49,24 +55,6 @@ class OpenAI:
                 raise_unless_retryable(response, final)
             await asyncio.sleep(0.5 * (2**attempt) + random.random() * 0.15)
         raise AssertionError("unreachable")
-
-    async def embed(self, texts: list[str]) -> tuple[list[list[float]], int]:
-        result = await self.post(
-            "/embeddings",
-            {
-                "model": self.settings.embedding_model,
-                "input": texts,
-                "dimensions": self.settings.dimensions,
-                "encoding_format": "float",
-            },
-        )
-        try:
-            vectors = checked_vectors(result, len(texts), self.settings.dimensions)
-        except (KeyError, TypeError, ValueError, OverflowError):
-            raise ProviderError(
-                "The embedding provider returned invalid vectors. Please retry."
-            ) from None
-        return vectors, token_usage(result, "total_tokens")
 
     async def structured(
         self,
@@ -125,6 +113,116 @@ class OpenAI:
         }
 
 
+class Codex:
+    """Runs model calls through `codex exec`, billed to the signed-in ChatGPT plan."""
+
+    def __init__(self, settings: Settings):
+        self.settings = settings
+
+    @property
+    def configured(self) -> bool:
+        return shutil.which("codex") is not None
+
+    async def close(self):
+        pass
+
+    async def structured(
+        self,
+        system: str,
+        content: str,
+        schema: dict,
+        name: str,
+        max_tokens: int = 2200,
+        model: str | None = None,
+        reasoning_effort: str = "none",
+    ) -> tuple[dict, dict]:
+        model = model or self.settings.model
+        with tempfile.TemporaryDirectory(prefix="runbook-codex-") as workdir:
+            schema_path = Path(workdir, f"{name}.json")
+            schema_path.write_text(json.dumps(schema))
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    "codex",
+                    "exec",
+                    "--ephemeral",
+                    "--skip-git-repo-check",
+                    "--ignore-user-config",
+                    "--ignore-rules",
+                    "--sandbox",
+                    "read-only",
+                    "--cd",
+                    workdir,
+                    "--model",
+                    model,
+                    "--config",
+                    f"model_reasoning_effort={reasoning_effort}",
+                    "--output-schema",
+                    str(schema_path),
+                    "--json",
+                    "-",
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+            except FileNotFoundError:
+                raise ProviderError(
+                    "Codex CLI is not installed. Install it and run `codex login`."
+                ) from None
+            try:
+                stdout, _ = await process.communicate(f"{system}\n\n{content}".encode())
+            except BaseException:
+                if process.returncode is None:
+                    process.kill()
+                    await process.wait()
+                raise
+        return codex_result(stdout, model)
+
+
+def codex_result(stdout: bytes, model: str) -> tuple[dict, dict]:
+    events = []
+    for line in stdout.splitlines():
+        try:
+            events.append(json.loads(line))
+        except ValueError:
+            continue
+    for event in events:
+        if event.get("type") == "turn.failed":
+            message = json.dumps(event)
+            if "model_not_found" in message:
+                raise ProviderError(
+                    f"Model {model} is not available to this Codex login."
+                )
+            raise ProviderError(
+                "Codex could not complete this request. Check `codex login status` and retry."
+            )
+    replies = [
+        event["item"].get("text", "")
+        for event in events
+        if event.get("type") == "item.completed"
+        and event["item"].get("type") == "agent_message"
+    ]
+    usage = next(
+        (e.get("usage", {}) for e in events if e.get("type") == "turn.completed"), {}
+    )
+    try:
+        answer = json.loads(replies[-1])
+        if not isinstance(answer, dict):
+            raise ValueError()
+    except (IndexError, ValueError):
+        raise ProviderError(
+            "The model returned an unreadable response. Please retry."
+        ) from None
+    return answer, {
+        "input_tokens": token_usage({"usage": usage}, "input_tokens"),
+        "output_tokens": token_usage({"usage": usage}, "output_tokens"),
+        "model": model,
+    }
+
+
+def model_client(settings: Settings) -> OpenAI | Codex:
+    return Codex(settings) if settings.backend == "codex" else OpenAI(settings)
+
+
 def json_object(response: httpx.Response) -> dict:
     try:
         result = response.json()
@@ -154,23 +252,6 @@ def error_code(response: httpx.Response) -> str | None:
         return response.json().get("error", {}).get("code")
     except (ValueError, AttributeError):
         return None
-
-
-def checked_vectors(result: dict, count: int, dimensions: int) -> list[list[float]]:
-    rows = sorted(result["data"], key=lambda row: row["index"])
-    if len(rows) != count or any(
-        type(row["index"]) is not int or row["index"] != i for i, row in enumerate(rows)
-    ):
-        raise ValueError("Embedding rows do not match the inputs.")
-    for row in rows:
-        vector = row["embedding"]
-        if not isinstance(vector, list) or len(vector) != dimensions:
-            raise ValueError("Wrong embedding dimensions.")
-        if any(type(v) not in (int, float) or not math.isfinite(v) for v in vector):
-            raise ValueError("Non-finite embedding value.")
-        if not 1e-24 < sum(v * v for v in vector) < 1e30:
-            raise ValueError("Degenerate embedding norm.")
-    return [row["embedding"] for row in rows]
 
 
 def token_usage(result: dict, key: str) -> int:

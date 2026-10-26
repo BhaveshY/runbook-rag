@@ -13,8 +13,9 @@ import numpy as np
 
 from .answer import StrictModel, diagnose, normalized
 from .config import RESOURCES, Settings
+from .embeddings import embed
 from .provenance import implementation_digest
-from .provider import OpenAI, ProviderError
+from .provider import ProviderError, model_client
 from .retrieval import (
     CANDIDATE_POOL,
     MAX_PER_DOCUMENT,
@@ -105,20 +106,18 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
     ]
     index = Index(settings)
     require_gold_passages(index, cases)
-    provider = OpenAI(settings)
+    provider = model_client(settings)
     retriever = Retriever(index, provider)
-    judge = OpenAI(replace(settings, model=settings.judge_model)) if answers else None
+    judge = (
+        model_client(replace(settings, model=settings.judge_model)) if answers else None
+    )
     records = []
-    total_embedding_tokens = 0
     started = perf_counter()
     try:
         for case in cases:
             embed_start = perf_counter()
-            embeddings, tokens = await provider.embed([case["question"]])
+            vector = embed([case["question"]], settings)[0]
             embed_ms = (perf_counter() - embed_start) * 1000
-            total_embedding_tokens += tokens
-            vector = np.array(embeddings[0], dtype=np.float32)
-            vector /= max(float(np.linalg.norm(vector)), 1e-12)
             record = {**case, "retrieval": {}}
             for mode in ("bm25", "dense", "hybrid", "reranked"):
                 rank_start = perf_counter()
@@ -292,6 +291,8 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
         "answerable_cases": len(answerable),
         "unanswerable_cases": len(records) - len(answerable),
         "configuration": {
+            "backend": settings.backend,
+            "judge_model": settings.judge_model,
             "embedding_model": settings.embedding_model,
             "dimensions": settings.dimensions,
             "model": settings.model,
@@ -305,7 +306,6 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
             "max_chunks_per_document": MAX_PER_DOCUMENT,
             "retrieval_k": 5,
             "answer_context_k": 8,
-            "embedding_tokens": total_embedding_tokens,
         },
         "environment": {
             "python": platform.python_version(),

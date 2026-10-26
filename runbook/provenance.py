@@ -34,6 +34,7 @@ def report_compatibility(
             differences.append(label)
     configuration = report.get("configuration", {})
     for key in (
+        "backend",
         "model",
         "rerank_model",
         "review_model",
