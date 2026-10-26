@@ -1,6 +1,7 @@
 import asyncio
 import json
 import re
+import shlex
 from time import perf_counter
 from typing import Literal
 
@@ -65,58 +66,40 @@ def normalized(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+READ_ONLY_VERBS = {"get", "describe", "logs", "top", "events", "explain", "version"}
+ALLOWED_FLAGS = {
+    "-n", "--namespace", "-A", "--all-namespaces", "-o", "--output", "-l",
+    "--selector", "--field-selector", "--show-labels", "-c", "--container",
+    "--all-containers", "-p", "--previous", "--tail", "--since", "--timestamps",
+    "--limit-bytes", "--sort-by", "--chunk-size", "--request-timeout",
+    "--no-headers", "--show-kind", "--ignore-not-found",
+}  # fmt: skip
+SECRET_REFERENCE = re.compile(r"(?:^|[/,.=])secrets?(?:$|[/,.=])", re.I)
+
+
 def safe_command(command: str) -> bool:
-    """Conservative display filter, not a shell sandbox. Commands are never executed."""
+    """Conservative display filter, not a shell sandbox. Commands are never executed.
+
+    Deliberately narrower than kubectl: rejects secrets in any alias or comma
+    list, attached short flags, and connection overrides.
+    """
     if re.search(r"[\n\r;|&><`$\\]", command):
         return False
     if not re.fullmatch(r"[\w\s./:=,'\"?*\-]+", command):
         return False
-    import shlex
-
     try:
         words = shlex.split(command)
     except ValueError:
         return False
     if len(words) < 2 or words[0] != "kubectl":
         return False
-    allowed = {"get", "describe", "logs", "top", "events", "explain", "version"}
-    if words[1] not in allowed and words[1:3] != ["auth", "can-i"]:
+    if words[1] not in READ_ONLY_VERBS and words[1:3] != ["auth", "can-i"]:
         return False
-    flags = {
-        "-n",
-        "--namespace",
-        "-A",
-        "--all-namespaces",
-        "-o",
-        "--output",
-        "-l",
-        "--selector",
-        "--field-selector",
-        "--show-labels",
-        "-c",
-        "--container",
-        "--all-containers",
-        "-p",
-        "--previous",
-        "--tail",
-        "--since",
-        "--timestamps",
-        "--limit-bytes",
-        "--sort-by",
-        "--chunk-size",
-        "--request-timeout",
-        "--no-headers",
-        "--show-kind",
-        "--ignore-not-found",
-    }
-    for word in words[2:]:
-        # Reject credential/resource aliases, comma lists, attached short flags,
-        # and connection overrides. This is deliberately narrower than kubectl.
-        if re.search(r"(?:^|[/,.=])secrets?(?:$|[/,.=])", word, re.I):
-            return False
-        if word.startswith("-") and word.split("=", 1)[0] not in flags:
-            return False
-    return True
+    return not any(
+        SECRET_REFERENCE.search(word)
+        or (word.startswith("-") and word.split("=", 1)[0] not in ALLOWED_FLAGS)
+        for word in words[2:]
+    )
 
 
 def validate_evidence(answer: Diagnosis, sources: list[dict]) -> tuple[Diagnosis, dict]:
@@ -161,7 +144,6 @@ def validate_evidence(answer: Diagnosis, sources: list[dict]) -> tuple[Diagnosis
         "exact_quotes_valid": valid_citations,
         "claims_removed": removed_claims,
         "checks_removed": removed_checks,
-        "semantic_support": "not automatically guaranteed",
     }
 
 
@@ -205,10 +187,14 @@ async def review_support(retriever: Retriever, query: str, answer: Diagnosis) ->
             "The evidence review could not complete. Retrieved passages remain available; please retry."
         ) from None
     answer.claims = [
-        c for c, supported in zip(answer.claims, review.claims) if supported
+        c
+        for c, supported in zip(answer.claims, review.claims, strict=True)
+        if supported
     ]
     answer.checks = [
-        c for c, supported in zip(answer.checks, review.checks) if supported
+        c
+        for c, supported in zip(answer.checks, review.checks, strict=True)
+        if supported
     ]
     if not answer.claims:
         answer.status = "insufficient_evidence"

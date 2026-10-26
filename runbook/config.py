@@ -1,4 +1,5 @@
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -11,44 +12,28 @@ RESOURCES = (
 WORKSPACE = ROOT if RESOURCES == ROOT else Path.cwd()
 
 
+def env(name: str, default, cast: Callable = str, secret: bool = False):
+    return field(
+        default_factory=lambda: cast(os.getenv(name, default)), repr=not secret
+    )
+
+
 @dataclass(frozen=True)
 class Settings:
-    data_dir: Path = field(
-        default_factory=lambda: Path(os.getenv("RUNBOOK_DATA_DIR", WORKSPACE / "data"))
+    data_dir: Path = env("RUNBOOK_DATA_DIR", WORKSPACE / "data", Path)
+    report_path: Path = env(
+        "RUNBOOK_EVAL_REPORT", WORKSPACE / "eval/results/latest.json", Path
     )
-    report_path: Path = field(
-        default_factory=lambda: Path(
-            os.getenv("RUNBOOK_EVAL_REPORT", WORKSPACE / "eval/results/latest.json")
-        )
+    api_key: str = env("OPENAI_API_KEY", "", secret=True)
+    base_url: str = env(
+        "OPENAI_BASE_URL", "https://api.openai.com/v1", lambda url: url.rstrip("/")
     )
-    api_key: str = field(
-        default_factory=lambda: os.getenv("OPENAI_API_KEY", ""), repr=False
-    )
-    base_url: str = field(
-        default_factory=lambda: os.getenv(
-            "OPENAI_BASE_URL", "https://api.openai.com/v1"
-        ).rstrip("/")
-    )
-    model: str = field(
-        default_factory=lambda: os.getenv("RUNBOOK_MODEL", "gpt-6-luna")
-    )
-    rerank_model: str = field(
-        default_factory=lambda: os.getenv("RUNBOOK_RERANK_MODEL", "gpt-6-luna")
-    )
-    review_model: str = field(
-        default_factory=lambda: os.getenv("RUNBOOK_REVIEW_MODEL", "gpt-6-luna")
-    )
-    embedding_model: str = field(
-        default_factory=lambda: os.getenv(
-            "RUNBOOK_EMBEDDING_MODEL", "text-embedding-3-small"
-        )
-    )
-    dimensions: int = field(
-        default_factory=lambda: int(os.getenv("RUNBOOK_EMBEDDING_DIMENSIONS", "768"))
-    )
-    access_token: str = field(
-        default_factory=lambda: os.getenv("RUNBOOK_ACCESS_TOKEN", ""), repr=False
-    )
-    daily_limit: int = field(
-        default_factory=lambda: int(os.getenv("RUNBOOK_DAILY_REQUEST_LIMIT", "200"))
-    )
+    model: str = env("RUNBOOK_MODEL", "gpt-6-luna")
+    rerank_model: str = env("RUNBOOK_RERANK_MODEL", "gpt-6-luna")
+    review_model: str = env("RUNBOOK_REVIEW_MODEL", "gpt-6-luna")
+    judge_model: str = env("RUNBOOK_JUDGE_MODEL", "gpt-6.1-sol")
+    judge_reasoning: str = env("RUNBOOK_JUDGE_REASONING", "low")
+    embedding_model: str = env("RUNBOOK_EMBEDDING_MODEL", "text-embedding-3-small")
+    dimensions: int = env("RUNBOOK_EMBEDDING_DIMENSIONS", "768", int)
+    access_token: str = env("RUNBOOK_ACCESS_TOKEN", "", secret=True)
+    daily_limit: int = env("RUNBOOK_DAILY_REQUEST_LIMIT", "200", int)

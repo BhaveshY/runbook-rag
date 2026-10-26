@@ -8,7 +8,7 @@ import os
 import re
 import shutil
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -189,7 +189,7 @@ async def _ingest(settings: Settings) -> dict:
             np.save(staging / "vectors.npy", vectors, allow_pickle=False)
             metadata = {
                 "corpus_id": corpus_id,
-                "built_at": datetime.now(timezone.utc).isoformat(),
+                "built_at": datetime.now(UTC).isoformat(),
                 "version": manifest["version"],
                 "revision": manifest["revision"],
                 "license": manifest["license"],
@@ -209,7 +209,7 @@ async def _ingest(settings: Settings) -> dict:
                         "sha256": group[0]["source_sha256"],
                         "path": doc["path"],
                     }
-                    for doc, group in zip(manifest["documents"], groups)
+                    for doc, group in zip(manifest["documents"], groups, strict=True)
                 ],
             }
             (staging / "manifest.json").write_text(

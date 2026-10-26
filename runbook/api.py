@@ -6,7 +6,7 @@ import time
 import uuid
 from collections import OrderedDict, deque
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request
@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
+from . import __version__
 from .answer import diagnose
 from .config import RESOURCES, Settings
 from .provenance import report_compatibility
@@ -38,14 +39,18 @@ async def lifespan(app: FastAPI):
         )
     app.state.slots = asyncio.Semaphore(4)
     app.state.rate = OrderedDict()
-    app.state.budget_date = datetime.now(timezone.utc).date()
+    app.state.budget_date = datetime.now(UTC).date()
     app.state.paid_requests = 0
     yield
     await app.state.provider.close()
 
 
 app = FastAPI(
-    title="Runbook", version="0.1.0", lifespan=lifespan, docs_url=None, redoc_url=None
+    title="Runbook",
+    version=__version__,
+    lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
 )
 
 
@@ -153,7 +158,7 @@ def check_access(request: Request, paid: bool):
             headers={"Retry-After": "60"},
         )
     if paid:
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
         if request.app.state.budget_date != today:
             request.app.state.budget_date, request.app.state.paid_requests = today, 0
         if request.app.state.paid_requests >= settings.daily_limit:

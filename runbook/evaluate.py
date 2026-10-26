@@ -7,7 +7,7 @@ import math
 import os
 import platform
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
 
@@ -17,7 +17,15 @@ from .answer import StrictModel, diagnose, normalized
 from .config import RESOURCES, Settings
 from .provenance import implementation_digest
 from .provider import OpenAI, ProviderError
-from .retrieval import Index, Retriever
+from .retrieval import (
+    CANDIDATE_POOL,
+    MAX_PER_DOCUMENT,
+    RERANK_CANDIDATES,
+    RERANK_MAX_PER_DOCUMENT,
+    RRF_K,
+    Index,
+    Retriever,
+)
 
 
 class Verdict(StrictModel):
@@ -98,9 +106,7 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
                 )
     provider = OpenAI(settings)
     retriever = Retriever(index, provider)
-    judge_model = os.getenv("RUNBOOK_JUDGE_MODEL", "gpt-6.1-sol")
-    judge_reasoning = os.getenv("RUNBOOK_JUDGE_REASONING", "low")
-    judge = OpenAI(replace(settings, model=judge_model)) if answers else None
+    judge = OpenAI(replace(settings, model=settings.judge_model)) if answers else None
     records = []
     total_embedding_tokens = 0
     started = perf_counter()
@@ -119,8 +125,8 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
                     case["question"],
                     mode,
                     vector if mode != "bm25" else None,
-                    30 if mode == "reranked" else 5,
-                    4 if mode == "reranked" else 2,
+                    RERANK_CANDIDATES if mode == "reranked" else 5,
+                    RERANK_MAX_PER_DOCUMENT if mode == "reranked" else MAX_PER_DOCUMENT,
                 )
                 ranking_ms = (perf_counter() - rank_start) * 1000
                 rerank_trace = {}
@@ -197,7 +203,7 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
                             Judgment.model_json_schema(),
                             "grounding_judgment",
                             4000,
-                            reasoning_effort=judge_reasoning,
+                            reasoning_effort=settings.judge_reasoning,
                         )
                         judgment = Judgment.model_validate(raw).model_dump()
                         ids = [c["claim_index"] for c in judgment["claims"]]
@@ -276,7 +282,7 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
 
     report = {
         "status": "completed",
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "elapsed_seconds": round(perf_counter() - started, 2),
         "dataset_sha256": hashlib.sha256(dataset_bytes).hexdigest(),
         "corpus_id": index.manifest["corpus_id"],
@@ -292,11 +298,11 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
             "rerank_model": settings.rerank_model,
             "review_model": settings.review_model,
             "default_mode": "reranked",
-            "rrf_k": 60,
-            "candidate_pool": 40,
-            "rerank_candidates": 30,
-            "rerank_input_max_per_document": 4,
-            "max_chunks_per_document": 2,
+            "rrf_k": RRF_K,
+            "candidate_pool": CANDIDATE_POOL,
+            "rerank_candidates": RERANK_CANDIDATES,
+            "rerank_input_max_per_document": RERANK_MAX_PER_DOCUMENT,
+            "max_chunks_per_document": MAX_PER_DOCUMENT,
             "retrieval_k": 5,
             "answer_context_k": 8,
             "embedding_tokens": total_embedding_tokens,
@@ -352,8 +358,8 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
             "attempted": len(attempts),
             "completed": len(completed),
             "failures": len(attempts) - len(completed),
-            "judge_model": judge_model,
-            "judge_reasoning": judge_reasoning,
+            "judge_model": settings.judge_model,
+            "judge_reasoning": settings.judge_reasoning,
             "judge_failures": sum("judge_error" in a for a in completed),
             "raw_citations": raw_citations,
             "raw_quote_validity": sum(
