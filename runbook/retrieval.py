@@ -24,7 +24,6 @@ STOP = set(
 
 
 def diversify(candidates, k: int, max_per_document: int) -> list[dict]:
-    """Take the first k candidates, at most max_per_document from each document."""
     selected, counts = [], Counter()
     for candidate in candidates:
         if counts[candidate["document_id"]] < max_per_document:
@@ -44,66 +43,60 @@ def tokenize(text: str) -> list[str]:
     ]
 
 
+def load_generation(
+    settings: Settings, corpus_id: str | None = None
+) -> tuple[dict, list[dict], np.ndarray]:
+    if corpus_id is None:
+        pointer = json.loads((settings.data_dir / "index/current.json").read_text())
+        if not isinstance(pointer, dict):
+            raise ValueError("Invalid index pointer.")
+        corpus_id = pointer.get("corpus_id")
+    if not isinstance(corpus_id, str) or not re.fullmatch(r"[a-f0-9]{20}", corpus_id):
+        raise ValueError("Invalid corpus identifier.")
+    directory = settings.data_dir / "index" / corpus_id
+    manifest = json.loads((directory / "manifest.json").read_text())
+    if not isinstance(manifest, dict) or manifest.get("corpus_id") != corpus_id:
+        raise ValueError("Invalid index manifest.")
+    for filename, key in (
+        ("chunks.json", "chunks_sha256"),
+        ("vectors.npy", "vectors_sha256"),
+    ):
+        if (
+            hashlib.sha256((directory / filename).read_bytes()).hexdigest()
+            != manifest[key]
+        ):
+            raise ValueError(f"Index integrity check failed: {filename}")
+    if (manifest["embedding_model"], manifest["dimensions"]) != (
+        settings.embedding_model,
+        settings.dimensions,
+    ):
+        raise ValueError("Embedding configuration changed; rebuild the index first.")
+    chunks = json.loads((directory / "chunks.json").read_text())
+    if not isinstance(chunks, list) or not chunks or len(chunks) != manifest["chunks"]:
+        raise ValueError("Invalid passage collection.")
+    vectors = np.load(directory / "vectors.npy", allow_pickle=False)
+    if (
+        vectors.dtype != np.float32
+        or vectors.shape != (len(chunks), settings.dimensions)
+        or not np.isfinite(vectors).all()
+        or not np.allclose(np.linalg.norm(vectors, axis=1), 1, atol=1e-4)
+    ):
+        raise ValueError("Invalid embedding matrix.")
+    fields = ("id", "title", "heading", "text", "document_id", "source_url")
+    if any(
+        not isinstance(chunk, dict)
+        or any(not isinstance(chunk.get(key), str) or not chunk[key] for key in fields)
+        for chunk in chunks
+    ):
+        raise ValueError("Invalid passage metadata.")
+    if len({chunk["id"] for chunk in chunks}) != len(chunks):
+        raise ValueError("Duplicate passage identifiers.")
+    return manifest, chunks, vectors
+
+
 class Index:
     def __init__(self, settings: Settings, corpus_id: str | None = None):
-        if corpus_id is None:
-            pointer = json.loads((settings.data_dir / "index/current.json").read_text())
-            if not isinstance(pointer, dict):
-                raise ValueError("Invalid index pointer.")
-            corpus_id = pointer.get("corpus_id")
-        if not isinstance(corpus_id, str) or not re.fullmatch(
-            r"[a-f0-9]{20}", corpus_id
-        ):
-            raise ValueError("Invalid corpus identifier.")
-        directory = settings.data_dir / "index" / corpus_id
-        self.manifest = json.loads((directory / "manifest.json").read_text())
-        if (
-            not isinstance(self.manifest, dict)
-            or self.manifest.get("corpus_id") != corpus_id
-        ):
-            raise ValueError("Invalid index manifest.")
-        for filename, key in (
-            ("chunks.json", "chunks_sha256"),
-            ("vectors.npy", "vectors_sha256"),
-        ):
-            if (
-                hashlib.sha256((directory / filename).read_bytes()).hexdigest()
-                != self.manifest[key]
-            ):
-                raise ValueError(f"Index integrity check failed: {filename}")
-        if (self.manifest["embedding_model"], self.manifest["dimensions"]) != (
-            settings.embedding_model,
-            settings.dimensions,
-        ):
-            raise ValueError(
-                "Embedding configuration changed; rebuild the index first."
-            )
-        self.chunks = json.loads((directory / "chunks.json").read_text())
-        if (
-            not isinstance(self.chunks, list)
-            or not self.chunks
-            or len(self.chunks) != self.manifest["chunks"]
-        ):
-            raise ValueError("Invalid passage collection.")
-        self.vectors = np.load(directory / "vectors.npy", allow_pickle=False)
-        if (
-            self.vectors.dtype != np.float32
-            or self.vectors.shape != (len(self.chunks), settings.dimensions)
-            or not np.isfinite(self.vectors).all()
-            or not np.allclose(np.linalg.norm(self.vectors, axis=1), 1, atol=1e-4)
-        ):
-            raise ValueError("Invalid embedding matrix.")
-        fields = ("id", "title", "heading", "text", "document_id", "source_url")
-        if any(
-            not isinstance(chunk, dict)
-            or any(
-                not isinstance(chunk.get(key), str) or not chunk[key] for key in fields
-            )
-            for chunk in self.chunks
-        ):
-            raise ValueError("Invalid passage metadata.")
-        if len({chunk["id"] for chunk in self.chunks}) != len(self.chunks):
-            raise ValueError("Duplicate passage identifiers.")
+        self.manifest, self.chunks, self.vectors = load_generation(settings, corpus_id)
         documents = [
             Counter(tokenize(f"{c['title']} {c['heading']} {c['text']}"))
             for c in self.chunks

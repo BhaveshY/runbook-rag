@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
         app.state.index_error = (
             "Index unavailable; run python -m runbook ingest."
             if isinstance(error, FileNotFoundError)
-            else "Index validation failed; rebuild the corpus."
+            else "Index validation failed. Delete the damaged index directory and run python -m runbook ingest."
         )
     app.state.slots = asyncio.Semaphore(4)
     app.state.rate = OrderedDict()
@@ -55,8 +55,6 @@ app = FastAPI(
 
 
 class BoundedBody:
-    """Bound the actual received body, including requests without Content-Length."""
-
     def __init__(self, app):
         self.app = app
 
@@ -143,7 +141,6 @@ def check_access(request: Request, paid: bool):
                 headers={"WWW-Authenticate": "Bearer"},
             )
     now = time.monotonic()
-    # Use the socket peer, never untrusted forwarding headers. Set a trusted reverse proxy explicitly when deploying.
     peer = request.client.host if request.client else "unknown"
     key = hashlib.sha256(peer.encode()).hexdigest()
     rate = request.app.state.rate

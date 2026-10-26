@@ -17,12 +17,12 @@ def main():
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8000)
     evaluate = sub.add_parser(
-        "evaluate", help="Run retrieval ablations and optional answer evaluation"
+        "evaluate", help="Compare the four retrieval modes on the benchmark questions"
     )
     evaluate.add_argument(
         "--answers",
         action="store_true",
-        help="Generate answers and run an independent, source-conditioned LLM judge (paid)",
+        help="Also generate answers and have a separate judge model grade them against the cited passages (paid API calls)",
     )
     evaluate.add_argument("--split", choices=["dev", "holdout", "all"], default="all")
     evaluate.add_argument("--output", default=str(Settings().report_path))

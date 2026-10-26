@@ -1,5 +1,3 @@
-"""Reproducible quality measurement, deliberately separate from application code paths."""
-
 import asyncio
 import hashlib
 import json
@@ -82,6 +80,15 @@ def retrieval_metrics(chunks: list[dict], case: dict) -> dict:
     }
 
 
+def require_gold_passages(index: Index, cases: list[dict]) -> None:
+    for case in cases:
+        for gold in case["gold"]:
+            if not any(matches(chunk, gold) for chunk in index.chunks):
+                raise ValueError(
+                    f"Gold passage does not exist in this corpus: {case['id']} / {gold['quote']}"
+                )
+
+
 def interval(values: list[float]) -> list[float]:
     rng = np.random.default_rng(20261022)
     samples = rng.choice(np.array(values), size=(2000, len(values)), replace=True).mean(
@@ -97,13 +104,7 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
         case for case in dataset["cases"] if split == "all" or case["split"] == split
     ]
     index = Index(settings)
-    # Reject broken relevance labels before calling any paid API.
-    for case in cases:
-        for gold in case["gold"]:
-            if not any(matches(chunk, gold) for chunk in index.chunks):
-                raise ValueError(
-                    f"Gold passage does not exist in this corpus: {case['id']} / {gold['quote']}"
-                )
+    require_gold_passages(index, cases)
     provider = OpenAI(settings)
     retriever = Retriever(index, provider)
     judge = OpenAI(replace(settings, model=settings.judge_model)) if answers else None
@@ -164,7 +165,6 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
                 flush=True,
             )
         if answers:
-            # Serial requests make the timing easy to interpret and avoid provider contention.
             for record in records:
                 if not record["answer_eval"]:
                     continue
@@ -313,14 +313,36 @@ async def evaluate(settings: Settings, answers: bool, split: str, output: str):
             "numpy": np.__version__,
             "blas_threads": os.getenv("OPENBLAS_NUM_THREADS", "default"),
         },
-        "methodology": "Evidence recall measures recovery of exact, labeled source passages; document recall measures source-page recovery. MRR measures the rank of the first relevant passage. nDCG rewards first recovery of each gold evidence item. Query embeddings are requested once per question without a cache; the same measured latency is charged to semantic, hybrid, and reranked search. Reranking scores 30 hybrid candidates with a separate model; its latency is included. BM25 requires no API. All outputs use the same top-5 and two-chunks-per-document cap; the rerank candidate pool permits four passages per document. Bootstrap intervals resample questions 2,000 times with a fixed seed. Answer evaluation uses cold query embeddings, serial generation, exact-quote validation, a production citation-support review, and a separate source-conditioned judge of retained claims and diagnostic checks. Review removals are reported explicitly; latency includes the review.",
+        "methodology": (
+            "Evidence recall is the share of labeled passages found in the top five. "
+            "Document recall counts the right page even when the passage differs. "
+            "MRR is the reciprocal rank of the first match. "
+            "nDCG credits the first match for each label and nothing for repeats. "
+            "Each question is embedded once without a cache, and that latency counts "
+            "toward semantic, hybrid, and reranked search. BM25 makes no API call. "
+            "Reranking asks a model to order 30 hybrid candidates, at most four per "
+            "page, and its latency counts. Every mode returns five passages, at most "
+            "two per page. Bootstrap intervals resample questions 2,000 times with a "
+            "fixed seed. Answer evaluation runs the full pipeline, including the "
+            "support review, then a separate judge grades each kept statement and "
+            "check against its cited passages."
+        ),
         "limitations": [
-            "Small, author-curated benchmark: 32 answerable questions and 8 abstention cases. It is not a production workload or an independent SOTA benchmark.",
-            "Questions and gold labels were created by the project author with AI assistance. The holdout partition is fixed but not blind: initial holdout results were inspected before adding reranking. The reranker was first measured on development questions. Treat all results as exploratory until externally validated.",
-            "Gold passage anchors are intentionally strict and incomplete. A different valid passage may be scored as a miss. Document recall is reported separately.",
-            "Exact quotation verifies provenance, not entailment. The separate LLM judge is a fallible proxy and may share biases with the answer model; read its per-claim verdicts.",
-            "Latency is from one machine and one serial run, not a load test or an SLA. External API latency, caches, and service conditions affect it.",
-            "This corpus covers Kubernetes 1.35 core documentation. It cannot observe a cluster, confirm its root cause, or cover every operator, cloud provider, or newer version.",
+            "The benchmark is small: 32 answerable questions and 8 that should be "
+            "refused. It is not a production workload.",
+            "The author wrote the questions and labels with AI help. The holdout "
+            "results were seen before reranking was added, so the holdout is not "
+            "blind. Treat these results as exploratory until someone outside the "
+            "project checks the labels.",
+            "Each question lists only some passages that answer it, so the evaluator "
+            "can score a correct passage as a miss. Document recall shows how often "
+            "the right page was found.",
+            "An exact quote proves where text came from, not that it supports the "
+            "statement. The judge is a model and may share the serving model's "
+            "mistakes, so read its per-statement verdicts.",
+            "Latency comes from one serial run on one machine. It is not a load test.",
+            "The corpus covers Kubernetes 1.35 core documentation. Runbook cannot see "
+            "a cluster or name its root cause.",
         ],
         "retrieval": summarize(answerable),
         "by_split": {

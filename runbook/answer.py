@@ -77,12 +77,7 @@ ALLOWED_FLAGS = {
 SECRET_REFERENCE = re.compile(r"(?:^|[/,.=])secrets?(?:$|[/,.=])", re.I)
 
 
-def safe_command(command: str) -> bool:
-    """Conservative display filter, not a shell sandbox. Commands are never executed.
-
-    Deliberately narrower than kubectl: rejects secrets in any alias or comma
-    list, attached short flags, and connection overrides.
-    """
+def read_only_kubectl(command: str) -> bool:
     if re.search(r"[\n\r;|&><`$\\]", command):
         return False
     if not re.fullmatch(r"[\w\s./:=,'\"?*\-]+", command):
@@ -129,7 +124,7 @@ def validate_evidence(answer: Diagnosis, sources: list[dict]) -> tuple[Diagnosis
         else:
             removed_claims += 1
     for check in answer.checks:
-        if valid(check) and safe_command(check.command):
+        if valid(check) and read_only_kubectl(check.command):
             checks.append(check)
         else:
             removed_checks += 1
@@ -138,7 +133,7 @@ def validate_evidence(answer: Diagnosis, sources: list[dict]) -> tuple[Diagnosis
         answer.status = "insufficient_evidence"
         answer.claims, answer.checks = [], []
         if removed_claims:
-            answer.limitation = "The generated claims did not pass exact-source citation validation. Review the retrieved evidence or provide more incident details."
+            answer.limitation = "No generated statement quoted its cited passage exactly. Read the evidence passages, or add details to the incident."
     return answer, {
         "citations_checked": total_citations,
         "exact_quotes_valid": valid_citations,
@@ -199,7 +194,7 @@ async def review_support(retriever: Retriever, query: str, answer: Diagnosis) ->
     if not answer.claims:
         answer.status = "insufficient_evidence"
         answer.checks = []
-        answer.limitation = "The retrieved quotations did not support a reliable diagnostic note. Inspect the passages or provide more incident context."
+        answer.limitation = "The quoted passages did not support any statement. Read the evidence passages, or add details to the incident."
     return {
         "performed": True,
         "claims_checked": len(review.claims),

@@ -1,5 +1,3 @@
-"""Build an immutable, checksummed corpus from a pinned upstream Git commit."""
-
 import asyncio
 import fcntl
 import hashlib
@@ -17,7 +15,7 @@ import yaml
 
 from .config import RESOURCES, Settings
 from .provider import OpenAI
-from .retrieval import Index
+from .retrieval import load_generation
 
 PIPELINE_VERSION = "heading-lines-v1"
 
@@ -156,8 +154,7 @@ async def _ingest(settings: Settings) -> dict:
     index_root.mkdir(exist_ok=True)
     target = index_root / corpus_id
     if target.is_dir():
-        # Never republish a damaged cached generation as a successful ingestion.
-        metadata = Index(settings, corpus_id).manifest
+        metadata, _, _ = load_generation(settings, corpus_id)
         print(f"Reusing {corpus_id}: {len(chunks)} chunks", flush=True)
     else:
         print(

@@ -50,7 +50,7 @@ function setView(view) {
     benchmark: "Evaluation",
     sources: "Source library",
   }[view];
-  document.title = `Runbook — ${$("#page-label").textContent}`;
+  document.title = `${$("#page-label").textContent} | Runbook`;
   if (view === "benchmark") loadBenchmark();
 }
 window.addEventListener("hashchange", () => setView(location.hash.slice(1)));
@@ -277,7 +277,7 @@ function downloadNote() {
     );
   lines.push("## Sources", "");
   result.sources.forEach((s, i) =>
-    lines.push(`${i + 1}. [${s.title} — ${s.heading}](${s.source_url})`),
+    lines.push(`${i + 1}. [${s.title} > ${s.heading}](${s.source_url})`),
   );
   lines.push("", "## Cited excerpts", "");
   const seen = new Set();
@@ -395,14 +395,12 @@ $("#incident-form").addEventListener("submit", async (event) => {
     });
     if (!response.ok) {
       if (response.status === 401) $("#access-row").hidden = false;
-      let message = "The request failed. Please try again.";
-      try {
-        const payload = await response.json();
-        if (typeof payload.detail === "string") message = payload.detail;
-      } catch {
-        /* Keep a readable error for proxy failures. */
-      }
-      throw new Error(message);
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(
+        typeof payload.detail === "string"
+          ? payload.detail
+          : "The request failed. Please try again.",
+      );
     }
     await readEvents(response, (name, payload) => {
       if (name === "evidence") renderEvidence(payload.sources);
@@ -512,8 +510,8 @@ function renderBenchmark(report) {
   );
   root.append(meta);
   const comparison = panel(
-    "Retrieval ablation",
-    "All outputs use the same chunks, questions, top-5 budget, and document-diversity cap. Reranking uses a separate model to order 30 hybrid candidates; its latency is included.",
+    "Retrieval modes",
+    "Every mode returns its top five passages from the same corpus, with at most two per page. Reranking asks a model to order 30 hybrid candidates, and its latency counts.",
   );
   const wrap = element("div", "table-wrap"),
     table = element("table"),
@@ -574,7 +572,7 @@ function renderBenchmark(report) {
     const a = report.answers,
       box = panel(
         "Answer evaluation",
-        "Generated answers are checked for exact source quotes and reviewed for support. A separate evaluation model judges retained claims and diagnostic checks; this is a proxy, not a correctness guarantee.",
+        "The server keeps only statements whose quotes match their passages and pass a support review. A separate judge model then grades each kept statement and check. A favorable grade is a model's opinion, not proof.",
       );
     const cards = element("div", "metric-grid panel-body");
     cards.append(

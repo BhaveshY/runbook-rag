@@ -13,7 +13,7 @@ QUOTA_EXHAUSTED = {"insufficient_quota", "billing_hard_limit_reached"}
 
 
 class ProviderError(Exception):
-    """An upstream failure safe to show to a client; never includes request headers."""
+    pass
 
 
 class OpenAI:

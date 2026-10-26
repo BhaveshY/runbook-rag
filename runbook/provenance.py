@@ -1,5 +1,3 @@
-"""Shared fingerprints keep displayed measurements tied to the code that ran."""
-
 import hashlib
 from pathlib import Path
 

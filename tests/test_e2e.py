@@ -1,5 +1,3 @@
-"""Run the real CLI and server against a local stand-in for the OpenAI API."""
-
 import hashlib
 import json
 import os
@@ -129,6 +127,8 @@ def app(tmp_path_factory):
     }
     run = [sys.executable, "-m", "runbook"]
     subprocess.run([*run, "ingest"], env=env, check=True, capture_output=True)
+    again = subprocess.run([*run, "ingest"], env=env, check=True, capture_output=True)
+    assert b"Reusing" in again.stdout
     port = free_port()
     server = subprocess.Popen([*run, "serve", "--port", str(port)], env=env)
     client = httpx.Client(
